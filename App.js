@@ -1,20 +1,33 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+// // screens/SignupScreen.js
+// import React from 'react';
+// import { View, Text } from 'react-native';
+// import SignupScreen from './screens/SignupScreen';
+// export default function SignupScreen() {
+//   try {
+//     // Gây lỗi thử
+//     // throw new Error("Lỗi giả lập để test");
+
+//     return (
+//       <View>
+//         <Text>Đăng ký</Text>
+//         {/* <SignupScreen /> */}
+//       </View>
+//     );
+//   } catch (err) {
+//     console.error("Lỗi trong SignupScreen:", err);
+//     return (
+//       <View>
+//         <SignupScreen />
+//         <Text style={{ color: 'red' }}>Lỗi: {err.message}</Text>
+//       </View>
+//     );
+//   }
+// }
+import React from 'react';
+import SignupScreen from './screens/SignupScreen';  
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SignupScreen />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

@@ -9,13 +9,27 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~5.0.4",
+    "@react-native-firebase/analytics": "^22.1.0",
+    "@react-native-firebase/app": "^22.1.0",
+    "@react-native-firebase/auth": "^22.1.0",
+    "@react-native-firebase/firestore": "^22.1.0",
     "expo": "~53.0.9",
     "expo-status-bar": "~2.2.3",
+    "firebase": "^11.7.1",
+    "formik": "^2.4.6",
+    "prop-types": "^15.8.1",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-dom": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-keyboard-aware-scrollview": "^2.1.0",
+    "react-native-safe-area-context": "^5.4.0",
+    "react-native-vector-icons": "^10.2.0",
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "@react-native-community/cli": "latest"
   },
   "private": true
 }

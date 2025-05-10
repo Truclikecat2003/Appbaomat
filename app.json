@@ -1,5 +1,6 @@
 {
   "expo": {
+    "runtimeVersion": "Hermes",
     "name": "bai4",
     "slug": "bai4",
     "version": "1.0.0",
