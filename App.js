@@ -1,33 +1,25 @@
-// // screens/SignupScreen.js
-// import React from 'react';
-// import { View, Text } from 'react-native';
-// import SignupScreen from './screens/SignupScreen';
-// export default function SignupScreen() {
-//   try {
-//     // Gây lỗi thử
-//     // throw new Error("Lỗi giả lập để test");
-
-//     return (
-//       <View>
-//         <Text>Đăng ký</Text>
-//         {/* <SignupScreen /> */}
-//       </View>
-//     );
-//   } catch (err) {
-//     console.error("Lỗi trong SignupScreen:", err);
-//     return (
-//       <View>
-//         <SignupScreen />
-//         <Text style={{ color: 'red' }}>Lỗi: {err.message}</Text>
-//       </View>
-//     );
-//   }
-// }
+import 'react-native-gesture-handler';
 import React from 'react';
-import SignupScreen from './screens/SignupScreen';  
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import LoginScreen from './screens/LoginScreen';
+import SignupScreen from './screens/SignupScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';  
+import HomeScreen from './screens/HomeScreen';
+import XacThucOtpScreen from './screens/XacThucOtpScreen';
+const Stack = createStackNavigator();
 
 export default function App() {
   return (
-    <SignupScreen />
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="LoginScreen">
+        {/* Only 'Screen' components should be direct children of the navigator */}
+        <Stack.Screen name="LoginScreen" component={LoginScreen} />
+        <Stack.Screen name="SignupScreen" component={SignupScreen} />
+        <Stack.Screen name="ForgotPasswordScreen" component={ForgotPasswordScreen} />
+        <Stack.Screen name="HomeScreen" component={HomeScreen} />
+         <Stack.Screen name="XacThucOtpScreen" component={XacThucOtpScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
