@@ -1,248 +1,100 @@
-// import React, { useState } from 'react';
-// import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-// import Icon from 'react-native-vector-icons/FontAwesome'; // Import FontAwesome icons
-// import { database, ref, get } from '../firebaseConfig';  // Lấy dữ liệu từ Firebase
-// import CryptoJS from 'crypto-js';  // Để mã hóa mật khẩu (nếu cần)
-// import { getDatabase, set } from 'firebase/database';  // Đảm bảo import 'set'
-
-// // Giả định bạn sử dụng một API gửi email (ví dụ, SendGrid hoặc Mailgun)
-// const sendEmail = (email, otp) => {
-//   // API giả định để gửi email, bạn cần thay thế với API thực tế như SendGrid hoặc Mailgun
-//   console.log(`Gửi email tới ${email} với mã OTP: ${otp}`);
-//   // Thực hiện HTTP request tới API gửi email ở đây
-// };
-
-// const ForgotPasswordScreen = ({ navigation }) => {
-//   const [email, setEmail] = useState('');
-
-// const handlePasswordReset = () => {
-//   const userId = email.split('@')[0]; // Dùng email làm ID
-
-//   // Lấy dữ liệu người dùng từ Firebase
-//   const userRef = ref(database, 'users/' + userId);
-//   get(userRef)
-//     .then((snapshot) => {
-//       if (snapshot.exists()) {
-//         // Nếu email tồn tại, tạo mã OTP
-//         fetch('http://192.168.1.8:3000/send-otp', {
-//           method: 'POST',
-//           headers: {
-//             'Content-Type': 'application/json',
-//           },
-//           body: JSON.stringify({ email }) // Gửi email, không gửi mã OTP, để server tạo mã OTP
-//         })
-//           .then((res) => res.json())
-//           .then((data) => {
-//             const otp = data.otp;  // Sử dụng mã OTP từ server
-
-//             console.log('Server response:', data);  // Log mã OTP từ server
-
-//             // Gửi thông báo tới người dùng
-//             Alert.alert('Thành công', 'Mã OTP đã được gửi đến email của bạn');
-
-//             // Lưu OTP vào Firebase (tạo cột OTP cho mỗi người dùng)
-//             const otpRef = ref(database, 'otps/' + userId);  // Tạo reference tới vị trí lưu OTP của người dùng
-//             set(otpRef, {
-//               otp,  // Lưu mã OTP từ server
-//               time: Date.now(),  // Lưu thời gian OTP được tạo
-//             }).then(() => {
-//               console.log('OTP đã được lưu vào Firebase:', otp); // Log mã OTP vừa được lưu
-//             }).catch((error) => {
-//               console.error('Lỗi lưu OTP vào Firebase:', error);
-//             });
-//           })
-//           .catch((err) => {
-//             console.error('Lỗi gửi OTP qua API:', err);
-//             Alert.alert('Lỗi', 'Không thể gửi OTP qua API');
-//           });
-//       } else {
-//         Alert.alert('Lỗi', 'Email không tồn tại trong hệ thống');
-//       }
-//     })
-//     .catch((error) => {
-//       Alert.alert('Lỗi', 'Đã xảy ra lỗi khi kiểm tra email');
-//       console.error(error);
-//     });
-// };
-
-//   React.useLayoutEffect(() => {
-//     navigation.setOptions({
-//       headerLeft: () => null,  
-//       title: 'Quên mật khẩu?', // Ẩn mũi tên back
-//     });
-//   }, [navigation]);
-
-//   return (
-//     <View style={styles.container}>
-//       <Text style={styles.title}>Forgot Password</Text>
-
-//       {/* Ô nhập email với icon */}
-//       <View style={styles.inputContainer}>
-//         <Icon name="envelope" size={20} color="#808080" style={styles.icon} />
-//         <TextInput
-//           style={styles.input}
-//           placeholder="Nhập email của bạn"
-//           value={email}
-//           onChangeText={setEmail}
-//         />
-//       </View>
-
-//       {/* Nút đặt lại mật khẩu */}
-//       <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
-//         <Text style={styles.buttonText}>Reset Password</Text>
-//       </TouchableOpacity>
-
-//       {/* Nút quay lại trang đăng nhập */}
-//       <TouchableOpacity
-//         style={styles.goBackButton}
-//         onPress={() => navigation.goBack()} // Điều hướng quay lại màn hình trước (LoginScreen)
-//       >
-//         <Text style={styles.goBackText}>Go back to Login</Text>
-//       </TouchableOpacity>
-//     </View>
-//   );
-// };
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome'; // Import FontAwesome icons
-import { database, ref, get } from '../firebaseConfig';  // Lấy dữ liệu từ Firebase
-import { getDatabase, set } from 'firebase/database';  // Đảm bảo import 'set'
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { get, ref, set } from 'firebase/database';  // Thêm 'set' để lưu dữ liệu vào Firebase
+import { database } from '../firebaseConfig';  
 
-const ForgotPasswordScreen = ({ navigation }) => {
+export default function ForgotPassword({ navigation }) {
   const [email, setEmail] = useState('');
 
-  const handlePasswordReset = () => {
-    const userId = email.split('@')[0]; // Dùng email làm ID
+  // Hàm kiểm tra email tồn tại trong Firebase
+  const checkEmailExists = async () => {
+    if (!email) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email.');
+      return false;
+    }
 
-    // Lấy dữ liệu người dùng từ Firebase
-    const userRef = ref(database, 'users/' + userId);
-    get(userRef)
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          // Nếu email tồn tại, tạo mã OTP
-          fetch('http://192.168.1.8:3000/send-otp', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email }) // Gửi email, không gửi mã OTP, để server tạo mã OTP
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              const otp = data.otp;  // Sử dụng mã OTP từ server
+    const userId = email.split('@')[0];  
+    const userRef = ref(database, 'users/' + userId);  
 
-              console.log('Server response:', data);  // Log mã OTP từ server
+    try {
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        return true;
+      } else {
+        Alert.alert('Lỗi', 'Email không tồn tại trong hệ thống');
+        return false;
+      }
+    } catch (error) {
+      console.error('Lỗi khi kiểm tra email:', error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi kiểm tra email.');
+      return false;
+    }
+  };
 
-              // Gửi thông báo tới người dùng
-              Alert.alert('Thành công', 'Mã OTP đã được gửi đến email của bạn');
+  // Hàm gửi OTP khi email hợp lệ và lưu vào Firebase
+  const sendOtp = async () => {
+    const isEmailValid = await checkEmailExists();
+    if (!isEmailValid) return;
 
-              // Lưu OTP vào Firebase (tạo cột OTP cho mỗi người dùng)
-              const otpRef = ref(database, 'otps/' + userId);  // Tạo reference tới vị trí lưu OTP của người dùng
-              set(otpRef, {
-                otp,  // Lưu mã OTP từ server
-                time: Date.now(),  // Lưu thời gian OTP được tạo
-              }).then(() => {
-                console.log('OTP đã được lưu vào Firebase:', otp); // Log mã OTP vừa được lưu
-
-                // Điều hướng đến màn hình XacThucOtpScreen và truyền email và userId
-                navigation.navigate('XacThucOtpScreen', { userId, email });
-              }).catch((error) => {
-                console.error('Lỗi lưu OTP vào Firebase:', error);
-              });
-            })
-            .catch((err) => {
-              console.error('Lỗi gửi OTP qua API:', err);
-              Alert.alert('Lỗi', 'Không thể gửi OTP qua API');
-            });
-        } else {
-          Alert.alert('Lỗi', 'Email không tồn tại trong hệ thống');
-        }
-      })
-      .catch((error) => {
-        Alert.alert('Lỗi', 'Đã xảy ra lỗi khi kiểm tra email');
-        console.error(error);
+    try {
+      const response = await fetch('http://192.168.32.7:3000/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('🔍 Phản hồi từ server:', JSON.stringify(data, null, 2));
+        console.log('Mã OTP đã gửi:', data.otp);
+
+        Alert.alert('Thành công', `Mã OTP đã được gửi đến ${email}`);
+
+        // 🔹 Lưu OTP vào Firebase
+        const userId = email.split('@')[0];
+        set(ref(database, `otps/${userId}`), {
+          email,
+          otp: data.otp,
+          timestamp: Date.now(),
+        });
+
+        navigation.navigate('XacThucOtpScreen'); // Chuyển sang màn hình xác thực OTP
+      } else {
+        Alert.alert('Lỗi', data?.error || 'Gửi OTP thất bại');
+      }
+    } catch (error) {
+      console.error('❌ Lỗi gửi OTP:', error);
+      Alert.alert('Lỗi kết nối', 'Không thể kết nối đến máy chủ.');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Forgot Password</Text>
-
-      {/* Ô nhập email với icon */}
-      <View style={styles.inputContainer}>
-        <Icon name="envelope" size={20} color="#808080" style={styles.icon} />
-        <TextInput
-          style={styles.input}
-          placeholder="Nhập email của bạn"
-          value={email}
-          onChangeText={setEmail}
-        />
-      </View>
-
-      {/* Nút đặt lại mật khẩu */}
-      <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
-        <Text style={styles.buttonText}>Reset Password</Text>
-      </TouchableOpacity>
-
-      {/* Nút quay lại trang đăng nhập */}
-      <TouchableOpacity
-        style={styles.goBackButton}
-        onPress={() => navigation.goBack()} // Điều hướng quay lại màn hình trước (LoginScreen)
-      >
-        <Text style={styles.goBackText}>Go back to Login</Text>
+      <Text style={styles.label}>Nhập email của bạn:</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="example@gmail.com"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={setEmail}
+      />
+      
+      <TouchableOpacity style={styles.button} onPress={sendOtp}>
+        <Text style={styles.buttonText}>Gửi OTP</Text>
       </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f8f8',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-  },
-  icon: {
-    marginRight: 10, 
-  },
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  label: { fontSize: 18, marginBottom: 10 },
   input: {
-    flex: 1, 
-    padding: 10,
+    borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 20, borderRadius: 5,
   },
   button: {
-    width: '100%',
-    padding: 15,
-    backgroundColor: '#007BFF',
-    borderRadius: 5,
-    alignItems: 'center',
+    backgroundColor: '#007bff', padding: 15, borderRadius: 5, alignItems: 'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  goBackButton: {
-    marginTop: 20,
-  },
-  goBackText: {
-    color: '#007BFF',
-    fontSize: 16,
-  },
+  buttonText: { color: 'white', fontWeight: 'bold' },
 });
-
-export default ForgotPasswordScreen;
