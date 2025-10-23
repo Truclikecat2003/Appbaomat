@@ -1,0 +1,110 @@
+const data = [
+  {
+    id: '1',
+    type: 'Web',
+    icon: '🌐',
+    color: '#0066CC',
+    lightColor: '#E3F2FD',
+    accentColor: '#00D9FF',
+    titles: [
+      'Bảo đảm an ninh con người trên không gian mạng từ góc độ pháp luật tại Việt Nam',
+      'Giải pháp bảo vệ người dân trên không gian mạng',
+      'Những điều cần biết để an toàn trong không gian mạng (UNICEF)',
+      'Không gian mạng là gì? Quyền con người trên không gian mạng? (Luật Minh Khuê)',
+      'Bảo vệ quyền riêng tư & thông tin cá nhân của người dân trên không gian mạng',
+      'Bảo vệ quyền con người trên không gian mạng trong bối cảnh đại dịch COVID-19',
+      'Toàn bộ quy định về An ninh mạng & an toàn thông tin mới nhất',
+      'Cybersecurity Law – đảm bảo quyền con người ở Việt Nam',
+      'Tổng quan quy định về an ninh mạng tại Việt Nam',
+      'Chiến lược an ninh mạng quốc gia Việt Nam đến năm 2025'
+    ],
+    urls: [
+      'https://lsvn.vn/bao-dam-an-ninh-con-nguoi-tren-khong-gian-mang-tu-goc-do-phap-luat-tai-viet-nam-1705592311-a140159.html',
+      'https://baochinhphu.vn/giai-phap-bao-ve-nguoi-dan-tren-khong-gian-mang-102221124123025802.htm',
+      'https://www.unicef.org/vietnam/vi/nhung-dieu-can-biet-de-toan-trong-khong-gian-mang',
+      'https://luatminhkhue.vn/khong-gian-mang-la-gi-phap-luat-ve-quyen-con-nguoi-tren-khong-gian-mang.aspx',
+      'https://qltt.vn/bao-ve-quyen-rieng-tu-va-thong-tin-ca-nhan-cua-nguoi-dan-tren-khong-gian-mang-99675.html',
+      'https://www.quanlynhanuoc.vn/2022/08/18/bao-ve-quyen-con-nguoi-tren-khong-gian-mang-trong-boi-canh-dai-dich-covid-19/',
+      'https://thuvienphapluat.vn/chu-de-van-ban/159/toan-bo-quy-dinh-ve-an-ninh-mang-va-an-toan-thong-tin-tren-khong-gian-mang-moi-nhat',
+      'https://tapchiqptd.vn/en/events-and-comments/cybersecurity-law-an-important-guarantee-of-human-rights-enforcement-in-vietnam/13126.html',
+      'https://generisonline.com/an-overview-of-cybersecurity-regulations-in-vietnam/',
+      'https://lawnet.vn/thong-tin-phap-luat/en/chinh-sach-moi/national-cyber-security-and-safety-strategy-proactively-responding-to-challenges-from-cyberspace-in-vietnam-127855.html'
+    ]
+  },
+  {
+    id: '2',
+    type: 'Video',
+    icon: '🎥',
+    color: '#D32F2F',
+    lightColor: '#FFEBEE',
+    accentColor: '#FF006E',
+    titles: [
+      'Khóa học React Native cơ bản trên YouTube',
+      'Hacking from begin to pro P1',
+      'Hacking from begin to pro P2',
+      'Hack with python',
+      'Cybersecurity and Human Rights – ảnh hưởng đến quyền con người',
+      'International Human Rights in Cyberspace – pháp lý và công dân',
+      'Cyber Scams and Human Trafficking (Việt Nam và Đông Nam Á)',
+      'The Ethics of CyberSecurity – những vấn đề đạo đức',
+      'Cybersecurity, Democracy and Human Rights – phân tích chính trị'
+    ],
+    urls: [
+      'https://www.youtube.com/watch?v=0-S5a0eXPoc',
+      'https://www.youtube.com/watch?v=cKEf8H9cQGM&t=60s',
+      'https://www.youtube.com/watch?v=QaXZJO1WlRA',
+      'https://www.youtube.com/watch?v=VNvNuIDrZo0',
+      'https://www.youtube.com/watch?v=zc4BiNDxNRk',
+      'https://www.youtube.com/watch?v=B7QVmUfT81s',
+      'https://www.youtube.com/watch?v=-vXNcx8jyck',
+      'https://www.youtube.com/watch?v=IKVaK5fU5io',
+      'https://www.youtube.com/watch?v=W1f2Xzj0Nro'
+    ]
+  },
+  {
+    id: '3',
+    type: 'PDF',
+    icon: '📄',
+    color: '#7B1FA2',
+    lightColor: '#F3E5F5',
+    accentColor: '#8338EC',
+    titles: [
+      'Tài liệu học React Native PDF',
+      'CISSP Study Guide.pdf',
+      'Cybersecurity and Human Rights – a human‑centric overview',
+      'A Human Rights‑Based Approach to Cybersecurity',
+      'Travel Guide to the Digital World: Cybersecurity for HRDs',
+      'National Cybersecurity Strategies and Human Rights',
+      'Human Rights for the Digital Age'
+    ],
+    urls: [
+      'https://reactnative.dev/docs/assets/react-native.pdf',
+      'https://drive.google.com/file/d/1GeIu2rSWx8Tu65Stou1vwJ-xfG6eqVCd/view?usp=drive_link',
+      'https://www.gp-digital.org/wp-content/uploads/2015/06/GCCS2015-Webinar-Series-Introductory-Text.pdf',
+      'https://www.apc.org/sites/default/files/APCExplainers_cybersecurity.pdf',
+      'https://www.gp-digital.org/wp-content/uploads/2016/05/Travel-Guide-to-the-Digital-World_Cybersecurity-Policy-for-HRD.pdf',
+      'https://www.gp-digital.org/wp-content/uploads/2022/04/Assessing-NCSS-from-human-rights-perspective.pdf',
+      'https://arxiv.org/pdf/2408.17302.pdf'
+    ]
+  },
+  {
+    id: '4',
+    type: 'App',
+    icon: '📱',
+    color: '#F57C00',
+    lightColor: '#FFF3E0',
+    accentColor: '#FFBE0B',
+    titles: ['Ứng dụng học thêm kiến thức về an ninh mạng'],
+    urls: ['https://drive.google.com/file/d/1zCubLHkL6w4wmEQjy61TmRCdpV7zGTne/view?usp=drive_link']
+  },
+  {
+    id: '5',
+    type: 'Diễn đàn',
+    icon: '💬',
+    color: '#00796B',
+    lightColor: '#E0F2F1',
+    accentColor: '#00D9A3',
+    titles: ['Diễn đàn công nghệ, nơi cập nhật những kiến thức mới nhất về bảo mật'],
+    urls: ['https://whitehat.vn']
+  }
+];

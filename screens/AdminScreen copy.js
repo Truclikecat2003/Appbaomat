@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import styles from '../Code/style';
+import MenuComponent from '../Code/MenuComponent';
 import Admin_menu from '../Code/Admin_menu';
+import CacBaiTrain from '../Code/CacBaiTrain';
 import QLTrain from '../Code/QLTrain';
 import GiaoDuc from '../Code/GiaoDuc';
 import BangDieuKhien from '../Code/bangdieukhien';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { database, ref, get, update } from '../firebaseConfig';
+import { database, ref, get, set, update, push } from '../firebaseConfig';
 
 const AdminScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -16,7 +18,6 @@ const AdminScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [lastLogin, setLastLogin] = useState('');
-  const [role, setRole] = useState('');
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -24,9 +25,9 @@ const AdminScreen = () => {
   const username = route.params?.username ?? '';
   const usernameKey = username.toLowerCase();
 
-  // ✅ Load avatar + role từ Firebase
+  // ✅ Load avatar từ bảng users
   useEffect(() => {
-    const loadUserData = async () => {
+    const loadAvatar = async () => {
       if (!usernameKey) return;
       try {
         const usersRef = ref(database, 'users');
@@ -42,17 +43,16 @@ const AdminScreen = () => {
             const userData = usersData[userId];
             if (userData.avatar) setAvatar({ uri: userData.avatar });
             if (userData.lastLogin) setLastLogin(userData.lastLogin);
-            if (userData.role) setRole(userData.role);
           }
         }
       } catch (error) {
-        console.error('Lỗi khi tải dữ liệu user:', error);
+        console.error('Lỗi khi tải avatar:', error);
       }
     };
-    loadUserData();
+    loadAvatar();
   }, [usernameKey]);
 
-  // ✅ Xin quyền ảnh
+  // ✅ Xin quyền truy cập ảnh
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -63,7 +63,7 @@ const AdminScreen = () => {
     return true;
   };
 
-  // ✅ Lưu avatar
+  // ✅ Lưu avatar trực tiếp vào bảng users (cột avatar)
   const saveAvatarToFirebase = async (uri) => {
     try {
       const usersRef = ref(database, 'users');
@@ -85,6 +85,7 @@ const AdminScreen = () => {
     }
   };
 
+  // ✅ Chụp ảnh
   const handleCapturePhoto = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
@@ -103,6 +104,7 @@ const AdminScreen = () => {
     }
   };
 
+  // ✅ Chọn ảnh từ thư viện
   const handlePickPhoto = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
@@ -121,6 +123,7 @@ const AdminScreen = () => {
     }
   };
 
+  // ✅ Đăng xuất
   const handleLogout = () => {
     setIsLoggedIn(false);
     Alert.alert('Thông báo', 'Bạn đã đăng xuất', [
@@ -133,12 +136,30 @@ const AdminScreen = () => {
       {!isLoggedIn ? null : (
         <ScrollView style={styles.container}>
           {/* Thanh trên cùng */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 16, marginTop: 10, zIndex: 20 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              paddingHorizontal: 16,
+              marginTop: 10,
+              zIndex: 20,
+            }}
+          >
             <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)}>
               <Icon name="menu" size={28} color="#333" />
             </TouchableOpacity>
 
-            <Text style={{ color: '#2c2c2c', fontSize: 15, fontWeight: '500', fontStyle: 'italic', opacity: 0.9 }}>
+            <Text
+              style={{
+                color: '#2c2c2c',
+                fontSize: 15,
+                fontWeight: '500',
+                fontStyle: 'italic',
+                opacity: 0.9,
+              }}
+            >
               👤 {username}
             </Text>
           </View>
@@ -177,8 +198,7 @@ const AdminScreen = () => {
             </View>
           </Modal>
 
-          {/* Menu */}
-          {menuVisible && <Admin_menu username={username} role={role} />}
+          {menuVisible && <Admin_menu username={{username, role}} />}
 
           <Text style={styles.description}>
             <Text style={styles.title}>Mô Phỏng Đào Tạo An Ninh Mạng</Text>{'\n'}
@@ -197,7 +217,17 @@ const AdminScreen = () => {
           <GiaoDuc />
 
           {lastLogin ? (
-            <Text style={{ textAlign: 'center', marginVertical: 10, color: '#666', fontStyle: 'italic', fontSize: 12 }} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={{
+                textAlign: 'center',
+                marginVertical: 10,
+                color: '#666',
+                fontStyle: 'italic',
+                fontSize: 12,
+              }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               Lần cuối đăng nhập: {new Date(lastLogin).toLocaleString()}
             </Text>
           ) : null}

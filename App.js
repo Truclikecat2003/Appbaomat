@@ -25,6 +25,7 @@ import QuanlyScreen from './screens/QuanlyScreen';
 import MophongScreen from './screens/MophongScreen';
 import BaomatScreen from './screens/BaomatScreen';
 import Banhrang from './components/banhrang';
+import QuanLyTaiLieuScreen from './screens/QuanLyTaiLieu';
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
           <Stack.Screen name="MophongScreen" component={MophongScreen} options={{ title: 'Mô phỏng lừa đảo' }}/>
           <Stack.Screen name="BaomatScreen" component={BaomatScreen} />
           <Stack.Screen name="Banhrang" component={Banhrang} /> 
+          <Stack.Screen name="QuanLyTaiLieu" component={QuanLyTaiLieuScreen} options={{ title: 'Quản Lý Tài Liệu' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
