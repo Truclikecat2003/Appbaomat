@@ -1,5 +1,5 @@
  import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, get, set, push } from 'firebase/database';
+import { getDatabase, ref, get, set, push, update } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 
 
@@ -24,4 +24,4 @@ const database = getDatabase(app);
 const storage = getStorage(app);
 
 // Xuất database, ref, get, set, push và storage để sử dụng ở các file khác
-export { database, ref, get, set, push, storage };
+export { database, ref, get, set, push, storage, update };

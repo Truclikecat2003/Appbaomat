@@ -10,7 +10,7 @@ import GiaoDuc from '../Code/GiaoDuc';
 import BangDieuKhien from '../Code/bangdieukhien';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { database, ref, get, set } from '../firebaseConfig';
+import { database, ref, get, set, update, push } from '../firebaseConfig';
 
 const AdminScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -22,19 +22,27 @@ const AdminScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
 
-  const userEmail = route.params?.userEmail ?? '';
-  const userId = userEmail.split('@')[0];
+  const username = route.params?.username ?? '';
+  const usernameKey = username.toLowerCase();
 
+  // ✅ Load avatar từ bảng users
   useEffect(() => {
     const loadAvatar = async () => {
-      if (!userId) return;
+      if (!usernameKey) return;
       try {
-        const avatarRef = ref(database, 'avatars/' + userId);
-        const snapshot = await get(avatarRef);
+        const usersRef = ref(database, 'users');
+        const snapshot = await get(usersRef);
+
         if (snapshot.exists()) {
-          const uri = snapshot.val();
-          if (uri) {
-            setAvatar({ uri });
+          const usersData = snapshot.val();
+          const userId = Object.keys(usersData).find(
+            (id) => usersData[id].username?.toLowerCase() === usernameKey
+          );
+
+          if (userId) {
+            const userData = usersData[userId];
+            if (userData.avatar) setAvatar({ uri: userData.avatar });
+            if (userData.lastLogin) setLastLogin(userData.lastLogin);
           }
         }
       } catch (error) {
@@ -42,51 +50,47 @@ const AdminScreen = () => {
       }
     };
     loadAvatar();
-  }, [userId]);
+  }, [usernameKey]);
 
-  useEffect(() => {
-    const loadLastLogin = async () => {
-      if (!userId) return;
-      try {
-        const userRef = ref(database, 'users/' + userId);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-          const userData = snapshot.val();
-          if (userData.lastLogin) {
-            setLastLogin(userData.lastLogin);
-          }
-        }
-      } catch (error) {
-        console.error('Lỗi khi tải lastLogin:', error);
-      }
-    };
-    loadLastLogin();
-  }, [userId]);
-
+  // ✅ Xin quyền truy cập ảnh
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
-      Alert.alert("Quyền truy cập bị từ chối!", "Bạn cần cấp quyền để sử dụng tính năng này.");
+      Alert.alert('Quyền truy cập bị từ chối!', 'Bạn cần cấp quyền để sử dụng tính năng này.');
       return false;
     }
     return true;
   };
 
+  // ✅ Lưu avatar trực tiếp vào bảng users (cột avatar)
   const saveAvatarToFirebase = async (uri) => {
     try {
-      const avatarRef = ref(database, 'avatars/' + userId);
-      await set(avatarRef, uri);
+      const usersRef = ref(database, 'users');
+      const snapshot = await get(usersRef);
+
+      if (snapshot.exists()) {
+        const usersData = snapshot.val();
+        const userId = Object.keys(usersData).find(
+          (id) => usersData[id].username?.toLowerCase() === usernameKey
+        );
+
+        if (userId) {
+          const userRef = ref(database, `users/${userId}`);
+          await update(userRef, { avatar: uri });
+        }
+      }
     } catch (error) {
-      console.error('Lỗi khi lưu avatar lên Firebase:', error);
+      console.error('Lỗi khi lưu avatar:', error);
     }
   };
 
+  // ✅ Chụp ảnh
   const handleCapturePhoto = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
-
     setModalVisible(false);
+
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 4],
@@ -100,11 +104,12 @@ const AdminScreen = () => {
     }
   };
 
+  // ✅ Chọn ảnh từ thư viện
   const handlePickPhoto = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
-
     setModalVisible(false);
+
     let result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [4, 4],
@@ -118,10 +123,11 @@ const AdminScreen = () => {
     }
   };
 
+  // ✅ Đăng xuất
   const handleLogout = () => {
     setIsLoggedIn(false);
-    Alert.alert("Thông báo", "Bạn đã đăng xuất", [
-      { text: "OK", onPress: () => navigation.navigate('LoginScreen') }
+    Alert.alert('Thông báo', 'Bạn đã đăng xuất', [
+      { text: 'OK', onPress: () => navigation.navigate('LoginScreen') },
     ]);
   };
 
@@ -129,11 +135,37 @@ const AdminScreen = () => {
     <View style={styles.container}>
       {!isLoggedIn ? null : (
         <ScrollView style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(!menuVisible)}>
+          {/* Thanh trên cùng */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              paddingHorizontal: 16,
+              marginTop: 10,
+              zIndex: 20,
+            }}
+          >
+            <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)}>
               <Icon name="menu" size={28} color="#333" />
             </TouchableOpacity>
 
+            <Text
+              style={{
+                color: '#2c2c2c',
+                fontSize: 15,
+                fontWeight: '500',
+                fontStyle: 'italic',
+                opacity: 0.9,
+              }}
+            >
+              👤 {username}
+            </Text>
+          </View>
+
+          {/* Header */}
+          <View style={[styles.header, { marginTop: 20 }]}>
             <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('DanhBaScreen')}>
               <Text style={styles.loginText}>📇 Danh bạ</Text>
             </TouchableOpacity>
@@ -142,12 +174,14 @@ const AdminScreen = () => {
               <TouchableOpacity onPress={() => setModalVisible(true)}>
                 <Image source={avatar} style={styles.avatar} />
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.loginButton} onPress={handleLogout}>
                 <Icon name="exit-to-app" size={28} />
               </TouchableOpacity>
             </View>
           </View>
 
+          {/* Modal chọn ảnh */}
           <Modal animationType="slide" transparent={true} visible={modalVisible}>
             <View style={styles.modalContainer}>
               <View style={styles.modalContent}>
@@ -164,18 +198,18 @@ const AdminScreen = () => {
             </View>
           </Modal>
 
-          {/* TRUYỀN userEmail QUA props CHO MenuComponent */}
-          {menuVisible && <Admin_menu userEmail={userEmail} />}
+          {menuVisible && <Admin_menu username={username} />}
 
           <Text style={styles.description}>
-            <Text style={styles.title}>Mô Phỏng Đào Tạo An Ninh Mạng</Text>{"\n"}
-            <Text style={styles.italicText}>Học cách nhận biết và ứng phó với các mối đe dọa an ninh phổ biến</Text>
+            <Text style={styles.title}>Mô Phỏng Đào Tạo An Ninh Mạng</Text>{'\n'}
+            <Text style={styles.italicText}>
+              Học cách nhận biết và ứng phó với các mối đe dọa an ninh phổ biến
+            </Text>
           </Text>
 
           <View style={styles.separator}></View>
 
-          {/* <CacBaiTrain navigation={navigation} /> */}
-          <QLTrain navigation={navigation}/>
+          <QLTrain navigation={navigation} />
 
           <View style={styles.separator}></View>
 
