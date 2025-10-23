@@ -1,30 +1,37 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import styles from './style'; 
+import styles from './style';
 
-const CacBaiTrain = () => {
+const CacBaiTrain = ({ navigation, userEmail }) => {
   return (
     <>
-    {/* Bài: Mô phỏng lừa đảo */}
-    <View style={styles.warningBox}>
+      {/* Bài: Mô phỏng lừa đảo */}
+      <View style={styles.warningBox}>
       <Text style={styles.warningTitle}>⚠️ Mô Phỏng Lừa Đảo</Text>
       <Text style={styles.chung}>Học cách nhận biết email và liên kết đáng ngờ.</Text>
       <Text style={styles.gioithieu}>
         Đây là mô-đun giúp bạn tìm hiểu về các cuộc tấn công lừa đảo phổ biến.
       </Text>
-      {/* Nút bắt đầu đào tạo */}
-      <TouchableOpacity style={styles.trainingButton}>
+      {/* Nút Quản Lý đào tạo */}
+      <TouchableOpacity 
+        style={styles.trainingButton} 
+        onPress={() => navigation.navigate('MophongScreen')}
+      >
         <Text style={styles.trainingButtonText}>Bắt Đầu Đào Tạo</Text>
       </TouchableOpacity>
     </View>
-    {/* Bài: Bảo mật mật khẩu */}
-    <View style={styles.securityBox}>
+
+      {/* Bài: Bảo mật mật khẩu */}
+      <View style={styles.securityBox}>
         <Text style={styles.securityTitle}>🔒 Bảo Mật Mật Khẩu</Text>
         <Text style={styles.chung}>Thực hành tạo mật khẩu mạnh và quản lý thông tin đăng nhập.</Text>
         <Text style={styles.intrusionDescription}>
           Tìm hiểu các phương pháp tốt nhất để quản lý mật khẩu và cách bảo vệ tài khoản khỏi truy cập trái phép.
         </Text>
-        <TouchableOpacity style={styles.securityButton}>
+        <TouchableOpacity
+          style={styles.securityButton}
+          onPress={() => navigation.navigate('BaomatScreen', { userEmail })} // Thêm navigation
+        >
           <Text style={styles.securityButtonText}>Bắt Đầu Đào Tạo</Text>
         </TouchableOpacity>
       </View>
@@ -36,7 +43,10 @@ const CacBaiTrain = () => {
         <Text style={styles.gioithieu}>
           Mô phỏng này dạy bạn cách nhận biết dấu hiệu phần mềm độc hại và các bước cần thực hiện.
         </Text>
-        <TouchableOpacity style={styles.malwareButton}>
+        <TouchableOpacity
+          style={styles.malwareButton}
+          onPress={() => navigation.navigate('UngPhoPhanMemDocHaiScreen')} // Thêm navigation
+        >
           <Text style={styles.malwareButtonText}>Bắt Đầu Đào Tạo</Text>
         </TouchableOpacity>
       </View>
@@ -53,7 +63,10 @@ const CacBaiTrain = () => {
         <Text style={styles.gioithieu}>
           Tìm hiểu cách các cuộc tấn công kỹ thuật xã hội khai thác tâm lý để lấy thông tin bí mật.
         </Text>
-        <TouchableOpacity style={styles.socialEngineeringButton}>
+        <TouchableOpacity
+          style={styles.socialEngineeringButton}
+          onPress={() => navigation.navigate('KyThuatXaHoiScreen')} // Thêm navigation
+        >
           <Text style={styles.socialEngineeringButtonText}>Bắt Đầu Đào Tạo</Text>
         </TouchableOpacity>
       </View>
@@ -65,7 +78,10 @@ const CacBaiTrain = () => {
         <Text style={styles.intrusionDescription}>
           Trải nghiệm các popup ransomware giả mạo đòi thanh toán Bitcoin và học cách nhận biết.
         </Text>
-        <TouchableOpacity style={styles.ransomwareButton}>
+        <TouchableOpacity
+          style={styles.ransomwareButton}
+          onPress={() => navigation.navigate('PhongVeRansomwareScreen')} // Thêm navigation
+        >
           <Text style={styles.ransomwareButtonText}>Bắt Đầu Đào Tạo</Text>
         </TouchableOpacity>
       </View>
@@ -77,7 +93,10 @@ const CacBaiTrain = () => {
         <Text style={styles.intrusionDescription}>
           Học cách phản ứng khi phát hiện hoạt động đáng ngờ, bao gồm khóa màn hình tự động.
         </Text>
-        <TouchableOpacity style={styles.intrusionButton}>
+        <TouchableOpacity
+          style={styles.intrusionButton}
+          onPress={() => navigation.navigate('UngPhoXamNhapScreen')} // Thêm navigation
+        >
           <Text style={styles.intrusionButtonText}>Bắt Đầu Đào Tạo</Text>
         </TouchableOpacity>
       </View>

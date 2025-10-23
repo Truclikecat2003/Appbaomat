@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
-import { get, ref, set } from 'firebase/database';  // Thêm 'set' để lưu dữ liệu vào Firebase
-import { database } from '../firebaseConfig';  
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { get, ref, set } from 'firebase/database';
+import { database } from '../firebaseConfig';
 
 export default function ForgotPassword({ navigation }) {
   const [email, setEmail] = useState('');
 
-  // Hàm kiểm tra email tồn tại trong Firebase
   const checkEmailExists = async () => {
     if (!email) {
       Alert.alert('Lỗi', 'Vui lòng nhập email.');
       return false;
     }
 
-    const userId = email.split('@')[0];  
-    const userRef = ref(database, 'users/' + userId);  
+    const encodedEmail = email.replace(/\./g, '_'); // ✅ giống LoginScreen
+    const userRef = ref(database, 'users/' + encodedEmail);
 
     try {
       const snapshot = await get(userRef);
@@ -31,13 +30,15 @@ export default function ForgotPassword({ navigation }) {
     }
   };
 
-  // Hàm gửi OTP khi email hợp lệ và lưu vào Firebase
   const sendOtp = async () => {
     const isEmailValid = await checkEmailExists();
     if (!isEmailValid) return;
 
+    // ✅ Điều hướng ngay lập tức
+    navigation.navigate('XacThucOtpScreen', { email });
+
     try {
-      const response = await fetch('http://192.168.32.7:3000/send-otp', {
+      const response = await fetch('http://192.168.1.8:3000/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -46,20 +47,14 @@ export default function ForgotPassword({ navigation }) {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('🔍 Phản hồi từ server:', JSON.stringify(data, null, 2));
-        console.log('Mã OTP đã gửi:', data.otp);
-
         Alert.alert('Thành công', `Mã OTP đã được gửi đến ${email}`);
+        const encodedEmail = email.replace(/\./g, '_');
 
-        // 🔹 Lưu OTP vào Firebase
-        const userId = email.split('@')[0];
-        set(ref(database, `otps/${userId}`), {
+        await set(ref(database, `otps/${encodedEmail}`), {
           email,
           otp: data.otp,
           timestamp: Date.now(),
         });
-
-        navigation.navigate('XacThucOtpScreen'); // Chuyển sang màn hình xác thực OTP
       } else {
         Alert.alert('Lỗi', data?.error || 'Gửi OTP thất bại');
       }
@@ -70,31 +65,84 @@ export default function ForgotPassword({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Nhập email của bạn:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="example@gmail.com"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      
-      <TouchableOpacity style={styles.button} onPress={sendOtp}>
-        <Text style={styles.buttonText}>Gửi OTP</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
+      <View style={styles.box}>
+        <Text style={styles.title}>Quên mật khẩu</Text>
+        <Text style={styles.subtitle}>Nhập email đã đăng ký để nhận mã OTP</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Email của bạn"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+          placeholderTextColor="#aaa"
+        />
+
+        <TouchableOpacity style={styles.button} onPress={sendOtp}>
+          <Text style={styles.buttonText}>Gửi OTP</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
-  label: { fontSize: 18, marginBottom: 10 },
+  container: {
+    flex: 1,
+    backgroundColor: '#f0f4f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  box: {
+    backgroundColor: '#ffffff',
+    width: '100%',
+    borderRadius: 15,
+    padding: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 10,
+    color: '#333',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   input: {
-    borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 20, borderRadius: 5,
+    backgroundColor: '#f9f9f9',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 20,
   },
   button: {
-    backgroundColor: '#007bff', padding: 15, borderRadius: 5, alignItems: 'center',
+    backgroundColor: '#3b82f6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  buttonText: { color: 'white', fontWeight: 'bold' },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

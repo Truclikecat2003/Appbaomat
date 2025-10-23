@@ -327,6 +327,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', // Căn giữa menu và avatar
     width: '100%',
     padding: 10,
+    backgroundColor: '#E0F7FA',
   },
   modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 10, width: 250 },
