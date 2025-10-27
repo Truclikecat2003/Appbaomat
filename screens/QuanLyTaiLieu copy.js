@@ -12,6 +12,7 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  InteractionManager,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Picker } from "@react-native-picker/picker";
@@ -37,13 +38,14 @@ export default function QuanLyTaiLieuScreen() {
   const [loaiTaiLieu, setLoaiTaiLieu] = useState("web");
   const [loading, setLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+
+  // ⚙️ Thêm cho chỉnh sửa
   const [dangSua, setDangSua] = useState(false);
   const [idDangSua, setIdDangSua] = useState(null);
-  const [tuKhoa, setTuKhoa] = useState(""); // 🔍 Từ khóa tìm kiếm
 
   const db = getDatabase(app);
 
-  // 🌧 Matrix background
+  // 🌧 Matrix effect
   const rainAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
@@ -57,10 +59,13 @@ export default function QuanLyTaiLieuScreen() {
     inputRange: [0, 1],
     outputRange: [0, -height],
   });
+
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*".split("");
   const [matrix, setMatrix] = useState([]);
+
   useEffect(() => {
-    const cols = 25, rows = 50;
+    const cols = 25;
+    const rows = 50;
     const data = Array.from({ length: cols }, (_, i) =>
       Array.from({ length: rows }, (_, j) => ({
         id: `col-${i}-row-${j}`,
@@ -68,6 +73,7 @@ export default function QuanLyTaiLieuScreen() {
       }))
     );
     setMatrix(data);
+
     const interval = setInterval(() => {
       setMatrix((prev) =>
         prev.map((col) =>
@@ -78,16 +84,23 @@ export default function QuanLyTaiLieuScreen() {
         )
       );
     }, 100);
+
     return () => clearInterval(interval);
   }, []);
 
-  // 📦 Lấy dữ liệu từ Firebase
+  // 📦 Lấy dữ liệu Firebase
   useEffect(() => {
+    let isMounted = true;
     const taiLieuRef = ref(db, "tailieu");
+
     const unsubscribe = onValue(taiLieuRef, (snapshot) => {
+      if (!isMounted) return;
       const data = snapshot.val();
       if (data) {
-        const arr = Object.keys(data).map((key) => ({ id: key, ...data[key] }));
+        const arr = Object.keys(data).map((key) => ({
+          id: key,
+          ...data[key],
+        }));
         cacheTaiLieu.current = arr;
         setTaiLieu(arr);
         setTaiLieuLoc(arr);
@@ -98,29 +111,17 @@ export default function QuanLyTaiLieuScreen() {
       }
       setIsReady(true);
     });
-    return () => unsubscribe();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const normalizeLink = (url) =>
     url.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
 
-  // 🔍 Tìm kiếm real-time
-  const timTaiLieu = (text) => {
-    setTuKhoa(text);
-    const key = text.trim().toLowerCase();
-    if (!key) {
-      setTaiLieuLoc(cacheTaiLieu.current);
-      return;
-    }
-    const loc = cacheTaiLieu.current.filter(
-      (item) =>
-        item.tentailieu.toLowerCase().includes(key) ||
-        item.nguoitao.toLowerCase().includes(key)
-    );
-    setTaiLieuLoc(loc);
-  };
-
-  // ➕ Thêm tài liệu (tối ưu tốc độ)
+  // ➕ Thêm tài liệu
   const themTaiLieu = async () => {
     if (loading) return;
     setLoading(true);
@@ -157,20 +158,24 @@ export default function QuanLyTaiLieuScreen() {
       nguoitao: username,
     };
 
-    cacheTaiLieu.current.unshift({ id, ...duLieuMoi });
-    setTaiLieuLoc([{ id, ...duLieuMoi }, ...taiLieuLoc]);
-    setModalVisible(false);
-    setTenTaiLieu("");
-    setLinkTaiLieu("");
-    setLoaiTaiLieu("web");
-    setLoading(false);
-
-    set(newRef, duLieuMoi).catch((err) => {
+    try {
+      await set(newRef, duLieuMoi);
+      cacheTaiLieu.current.unshift(duLieuMoi);
+      setTaiLieuLoc([duLieuMoi, ...taiLieuLoc]);
+      InteractionManager.runAfterInteractions(() => {
+        setModalVisible(false);
+        setTenTaiLieu("");
+        setLinkTaiLieu("");
+        setLoaiTaiLieu("web");
+      });
+    } catch (err) {
       Alert.alert("❌ Lỗi ghi Firebase", err.message);
-    });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ✏️ Sửa tài liệu (tối ưu tốc độ)
+  // ✏️ Sửa tài liệu
   const suaTaiLieu = async () => {
     if (loading) return;
     setLoading(true);
@@ -181,36 +186,35 @@ export default function QuanLyTaiLieuScreen() {
       return;
     }
 
-    const capNhatRef = ref(db, "tailieu/" + idDangSua);
-    const ngaySua = new Date().toLocaleDateString("vi-VN");
-    const duLieuSua = {
-      tentailieu: tenTaiLieu.trim(),
-      loai: loaiTaiLieu.toUpperCase(),
-      link: linkTaiLieu.trim(),
-      ngaytao: ngaySua,
-      nguoitao: username,
-    };
+    try {
+      const capNhatRef = ref(db, "tailieu/" + idDangSua);
+      const ngaySua = new Date().toLocaleDateString("vi-VN");
+      const duLieuSua = {
+        tentailieu: tenTaiLieu.trim(),
+        loai: loaiTaiLieu.toUpperCase(),
+        link: linkTaiLieu.trim(),
+        ngaytao: ngaySua,
+        nguoitao: username,
+      };
 
-    const danhSachMoi = cacheTaiLieu.current.map((tl) =>
-      tl.id === idDangSua ? { ...tl, ...duLieuSua } : tl
-    );
-    cacheTaiLieu.current = danhSachMoi;
-    setTaiLieuLoc(danhSachMoi);
-
-    setModalVisible(false);
-    setDangSua(false);
-    setIdDangSua(null);
-    setTenTaiLieu("");
-    setLinkTaiLieu("");
-    setLoaiTaiLieu("web");
-    setLoading(false);
-
-    set(capNhatRef, duLieuSua).catch((err) => {
+      await set(capNhatRef, duLieuSua);
+      Alert.alert("✅ Thành công", "Đã cập nhật tài liệu!");
+      InteractionManager.runAfterInteractions(() => {
+        setModalVisible(false);
+        setDangSua(false);
+        setIdDangSua(null);
+        setTenTaiLieu("");
+        setLinkTaiLieu("");
+        setLoaiTaiLieu("web");
+      });
+    } catch (err) {
       Alert.alert("❌ Lỗi cập nhật", err.message);
-    });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 🗑 Xóa
+  // 🗑 Xóa tài liệu
   const xoaTaiLieu = async (id) => {
     Alert.alert("Xác nhận", "Bạn có chắc muốn xóa tài liệu này?", [
       { text: "Hủy", style: "cancel" },
@@ -225,8 +229,9 @@ export default function QuanLyTaiLieuScreen() {
   const locTheoLoai = (loai) => {
     setLoaiLoc(loai);
     setShowFilter(false);
-    if (loai === "tatca") setTaiLieuLoc(cacheTaiLieu.current);
-    else {
+    if (loai === "tatca") {
+      setTaiLieuLoc(cacheTaiLieu.current);
+    } else {
       const loc = cacheTaiLieu.current.filter(
         (item) => item.loai.toLowerCase() === loai.toLowerCase()
       );
@@ -257,6 +262,7 @@ export default function QuanLyTaiLieuScreen() {
         </Text>
       </View>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {/* 🖋 Cây bút sửa */}
         <TouchableOpacity
           onPress={() => {
             setDangSua(true);
@@ -269,6 +275,7 @@ export default function QuanLyTaiLieuScreen() {
         >
           <Icon name="pencil-outline" color="#00FFAA" size={24} style={{ marginRight: 8 }} />
         </TouchableOpacity>
+
         <Text style={styles.cardType}>{item.loai}</Text>
         <TouchableOpacity onPress={() => xoaTaiLieu(item.id)}>
           <Icon name="delete-outline" color="#ff4444" size={24} />
@@ -311,23 +318,6 @@ export default function QuanLyTaiLieuScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 🔍 Thanh tìm kiếm */}
-      <View style={styles.searchContainer}>
-        <Icon name="magnify" size={22} color="#00FFAA" style={{ marginRight: 8 }} />
-        <TextInput
-          placeholder="Tìm theo tên hoặc người tạo..."
-          placeholderTextColor="#66ffaa"
-          style={styles.searchInput}
-          value={tuKhoa}
-          onChangeText={timTaiLieu}
-        />
-        {tuKhoa.length > 0 && (
-          <TouchableOpacity onPress={() => timTaiLieu("")}>
-            <Icon name="close-circle" size={20} color="#00FFAA" />
-          </TouchableOpacity>
-        )}
-      </View>
-
       {showFilter && (
         <View style={styles.filterMenu}>
           {["tatca", "web", "video", "pdf", "app", "diễn đàn"].map((loai) => (
@@ -346,7 +336,7 @@ export default function QuanLyTaiLieuScreen() {
         <FlatList data={taiLieuLoc} renderItem={renderItem} keyExtractor={(item) => item.id} />
       )}
 
-      {/* Modal thêm / sửa */}
+      {/* Modal thêm / sửa tài liệu */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
@@ -382,7 +372,9 @@ export default function QuanLyTaiLieuScreen() {
               {loading ? (
                 <ActivityIndicator color="#003322" />
               ) : (
-                <Text style={styles.saveButtonText}>{dangSua ? "Cập nhật" : "Lưu"}</Text>
+                <Text style={styles.saveButtonText}>
+                  {dangSua ? "Cập nhật" : "Lưu"}
+                </Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -409,23 +401,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#00FFAA55",
   },
   headerText: { color: "#00FFAA", fontWeight: "bold", fontSize: 18 },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0,50,30,0.8)",
-    marginHorizontal: 10,
-    marginTop: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#00FFAA55",
-    paddingHorizontal: 10,
-  },
-  searchInput: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 14,
-    paddingVertical: 8,
-  },
   filterMenu: {
     backgroundColor: "rgba(0,50,30,0.9)",
     borderBottomWidth: 1,

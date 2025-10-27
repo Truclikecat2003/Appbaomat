@@ -1,0 +1,5 @@
+<Picker.Item label="Web" value="Web" />
+              <Picker.Item label="Video" value="Video" />
+              <Picker.Item label="PDF" value="PDF" />
+              <Picker.Item label="App" value="App" />
+              <Picker.Item label="Diễn đàn" value="Diễn đàn" />

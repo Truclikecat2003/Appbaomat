@@ -1,0 +1,56 @@
+import { StyleSheet } from "react-native";
+
+export default StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 15,
+    backgroundColor: "rgba(0,30,20,0.8)",
+    borderBottomWidth: 1,
+    borderBottomColor: "#00FFAA55",
+  },
+  headerText: {
+    color: "#00FFAA",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  card: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    margin: 10,
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,50,30,0.6)",
+    borderWidth: 1,
+    borderColor: "#00FFAA77",
+  },
+  cardTitle: { color: "#fff", marginLeft: 8, flexShrink: 1 },
+  cardLink: {
+    color: "#00FFAA",
+    marginLeft: 32,
+    marginTop: 3,
+    fontSize: 12,
+    textDecorationLine: "underline",
+  },
+  cardType: { color: "#00FFAA", marginRight: 10 },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "85%",
+    backgroundColor: "rgba(0,40,30,0.95)",
+    padding: 20,
+    borderRadius: 12,
+    borderColor: "#00FFAA55",
+    borderWidth: 1,
+  },
+  modalTitle: { color: "#00FFAA", fontSize: 18, textAlign: "center", marginBottom: 10 },
+  input: { backgroundColor: "#001A12", color: "#fff", borderRadius: 8, padding: 10, marginVertical: 5 },
+  picker: { backgroundColor: "#001A12", color: "#00FFAA", marginVertical: 8 },
+  saveButton: { backgroundColor: "#00FFAA", padding: 10, borderRadius: 8 },
+  saveButtonText: { textAlign: "center", color: "#003322", fontWeight: "bold" },
+  cancelText: { color: "#ff5555", textAlign: "center", marginTop: 10 },
+});
