@@ -1,0 +1,556 @@
+// tailieu.js - Firebase Connected + "Pro Hacking" Green Theme + CTF UI (full file)
+// - Keeps original Firebase grouping logic
+// - Adds: challenge list, per-challenge hint system, sandbox "Run" (terminal embed simulation),
+//   real-time scoreboard (listens to 'scoreboard' node), and a compact leaderboard panel.
+// Copy-paste this file into your project (adjust firebaseConfig import path if needed).
+
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Linking,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  ScrollView,
+  Platform,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { getDatabase, ref, get, onValue } from "firebase/database";
+import { app } from "../firebaseConfig";
+
+const { width, height } = Dimensions.get("window");
+
+/* ---------------------------------------------------------------------------
+  AnimatedBackground
+  subtle "pro-hacking" green motion blobs + faint matrix lines
+--------------------------------------------------------------------------- */
+const AnimatedBackground = () => {
+  const anim1 = useRef(new Animated.Value(0)).current;
+  const anim2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loopAnim = (anim, duration) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 1, duration, useNativeDriver: false }),
+          Animated.timing(anim, { toValue: 0, duration, useNativeDriver: false }),
+        ])
+      ).start();
+
+    loopAnim(anim1, 9000);
+    loopAnim(anim2, 13000);
+  }, []);
+
+  const tx1 = anim1.interpolate({ inputRange: [0, 1], outputRange: [0, 36] });
+  const ty1 = anim1.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
+  const tx2 = anim2.interpolate({ inputRange: [0, 1], outputRange: [0, -56] });
+  const ty2 = anim2.interpolate({ inputRange: [0, 1], outputRange: [0, -34] });
+
+  return (
+    <View style={styles.bgContainer}>
+      <LinearGradient
+        colors={["#00130a", "#03180c", "#071c0f"]}
+        style={styles.bgGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <Animated.View style={[styles.blobContainer, { transform: [{ translateX: tx1 }, { translateY: ty1 }], top: "6%", left: "4%" }]}>
+        <View style={[styles.blob, { backgroundColor: "rgba(0,255,110,0.04)", borderColor: "rgba(0,255,110,0.12)", borderWidth: 1 }]} />
+      </Animated.View>
+
+      <Animated.View style={[styles.blobContainer, { transform: [{ translateX: tx2 }, { translateY: ty2 }], bottom: "8%", right: "6%" }]}>
+        <View style={[styles.blob, { backgroundColor: "rgba(0,200,80,0.03)", borderColor: "rgba(0,200,80,0.1)", borderWidth: 1 }]} />
+      </Animated.View>
+
+      <Animated.View style={[styles.matrix, { opacity: 0.06 }]} pointerEvents="none">
+        <Text style={styles.matrixText}>▉▉ ▉▉ ▉▉ ▉▉ ▉▉ ▉▉ ▉▉</Text>
+      </Animated.View>
+    </View>
+  );
+};
+
+/* ---------------------------------------------------------------------------
+  TerminalEmbed
+  small reusable component that simulates a terminal run with animated text.
+  Props:
+    - visible (bool)
+    - onClose (func)
+    - command (string) - displayed command
+    - outputLines (array of strings) - lines to show
+--------------------------------------------------------------------------- */
+function TerminalEmbed({ visible, onClose, command = "run-sandbox", outputLines = [] }) {
+  const [index, setIndex] = useState(0);
+  const [visibleLines, setVisibleLines] = useState([]);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (!visible) {
+      // reset
+      setIndex(0);
+      setVisibleLines([]);
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    setVisibleLines([]);
+    setIndex(0);
+    let i = 0;
+    timerRef.current = setInterval(() => {
+      setVisibleLines((prev) => [...prev, outputLines[i] || ""]);
+      i++;
+      if (i >= outputLines.length) {
+        clearInterval(timerRef.current);
+      }
+    }, 220);
+
+    return () => clearInterval(timerRef.current);
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.terminalModalOverlay}>
+        <View style={styles.terminalBox}>
+          <View style={styles.terminalHeader}>
+            <Text style={styles.terminalTitle}>Sandbox Terminal</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.terminalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.terminalContent}>
+            <Text style={styles.terminalCommand}>$ {command}</Text>
+            <ScrollView style={{ flex: 1, marginTop: 8 }}>
+              {visibleLines.map((l, idx) => (
+                <Text key={idx} style={styles.terminalLine}>
+                  {l}
+                </Text>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+              <TouchableOpacity style={styles.terminalBtn} onPress={onClose}>
+                <Text style={styles.terminalBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+  Scoreboard component (real-time)
+  - listens to `scoreboard` node in firebase (if exists)
+  - expects structure: { uid1: {name, score}, uid2: {name, score}, ... }
+--------------------------------------------------------------------------- */
+function ScoreboardPanel({ dbApp }) {
+  const [scores, setScores] = useState([]);
+
+  useEffect(() => {
+    const db = getDatabase(dbApp);
+    const sbRef = ref(db, "scoreboard");
+    const unsub = onValue(sbRef, (snap) => {
+      if (!snap.exists()) {
+        setScores([]);
+        return;
+      }
+      const raw = snap.val();
+      // Convert to sorted array
+      const arr = Object.keys(raw).map((k) => ({ id: k, name: raw[k].name || "Anon", score: raw[k].score || 0 }));
+      arr.sort((a, b) => b.score - a.score);
+      setScores(arr.slice(0, 10)); // top 10
+    });
+
+    return () => unsub();
+  }, [dbApp]);
+
+  return (
+    <View style={styles.scoreboard}>
+      <Text style={styles.scoreboardTitle}>Leaderboard</Text>
+      {scores.length === 0 ? (
+        <Text style={styles.scoreEmpty}>No scores yet</Text>
+      ) : (
+        scores.map((s, i) => (
+          <View key={s.id} style={styles.scoreRow}>
+            <Text style={styles.scoreRank}>{i + 1}.</Text>
+            <Text style={styles.scoreName}>{s.name}</Text>
+            <Text style={styles.scoreValue}>{s.score}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+  Main screen - keeps original fetching/grouping logic, only UI upgraded.
+--------------------------------------------------------------------------- */
+export default function TailieuScreen() {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const username = route.params?.userData?.username ?? "";
+  const role = route.params?.userData?.role ?? "";
+
+  const [expandedId, setExpandedId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState([]);
+
+  // hint modal state
+  const [hintVisible, setHintVisible] = useState(false);
+  const [currentHint, setCurrentHint] = useState("");
+  const [terminalVisible, setTerminalVisible] = useState(false);
+  const [terminalOutput, setTerminalOutput] = useState(["Launching sandbox..."]);
+
+  const toggleExpand = (id) => setExpandedId(expandedId === id ? null : id);
+
+  // Keep original get() logic (single fetch) and grouping by `loai`.
+  useEffect(() => {
+    const fetchData = async () => {
+      const start = Date.now();
+      try {
+        const db = getDatabase(app);
+        const snap = await get(ref(db, "tailieu"));
+        if (!snap.exists()) {
+          setData([]);
+          setLoading(false);
+          return;
+        }
+
+        const raw = snap.val();
+        const ds = Object.values(raw);
+
+        // base groups (uppercase matching) - keep same mapping as original logic
+        const base = {
+          WEB: { id: "1", type: "Web", icon: "🌐", color: "#7df0a1", lightColor: "#072117", accentColor: "#00FF88", titles: [], urls: [] },
+          VIDEO: { id: "2", type: "Video", icon: "🎥", color: "#6ef0b1", lightColor: "#072017", accentColor: "#00E6A0", titles: [], urls: [] },
+          PDF: { id: "3", type: "PDF", icon: "📄", color: "#58d98f", lightColor: "#071611", accentColor: "#00CC77", titles: [], urls: [] },
+          APP: { id: "4", type: "App", icon: "📱", color: "#44f08e", lightColor: "#071f12", accentColor: "#22FF77", titles: [], urls: [] },
+          "DIỄN ĐÀN": { id: "5", type: "Diễn đàn", icon: "💬", color: "#3be07d", lightColor: "#06160f", accentColor: "#1AFF66", titles: [], urls: [] },
+        };
+
+        // Group quickly (same logic)
+        for (const tl of ds) {
+          const loai = (tl.loai || "").toUpperCase();
+          if (base[loai]) {
+            base[loai].titles.push(tl.tentailieu || "Untitled");
+            base[loai].urls.push(tl.link || "");
+          }
+        }
+
+        const groups = Object.values(base).filter((g) => g.titles.length > 0);
+        setData(groups);
+      } catch (err) {
+        console.error("Firebase load error:", err);
+      } finally {
+        setLoading(false);
+        console.log("Load time:", (Date.now() - start) / 1000, "s");
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Hint loader: attempts to read hint from `hints/<groupType>/<index>` in Firebase (non-blocking)
+  const loadHint = async (groupType, index) => {
+    try {
+      const db = getDatabase(app);
+      const hintKey = `${groupType}-${index}`; // simple derived key
+      const snap = await get(ref(db, `hints/${hintKey}`));
+      if (snap.exists()) {
+        return snap.val().hint || "No hint found.";
+      }
+      // fallback: small generic hint
+      return `Gợi ý: thử đọc tiêu đề và tìm keyword kỹ thuật liên quan đến "${groupType}".`;
+    } catch (err) {
+      console.warn("Hint fetch error:", err);
+      return "Lỗi khi lấy hint.";
+    }
+  };
+
+  // When user requests a hint open modal and fetch a hint quickly
+  const onRequestHint = async (groupType, index) => {
+    setHintVisible(true);
+    setCurrentHint("Đang tải gợi ý...");
+    const hint = await loadHint(groupType, index);
+    setCurrentHint(hint);
+  };
+
+  // Sandbox run: simple simulated output lines; keep lightweight
+  const onRunSandbox = (challengeTitle) => {
+    // quick simulated lines
+    const lines = [
+      `Initializing sandbox for: ${challengeTitle}`,
+      "Setting up environment...",
+      "Downloading challenge resources...",
+      "Running static analysis...",
+      "Executing test payload...",
+      "No obvious vuln detected. Try fuzzing or check inputs.",
+      "Sandbox run complete. Exit code 0.",
+    ];
+    setTerminalOutput(lines);
+    setTerminalVisible(true);
+  };
+
+  /* -------------------------------------------------------------------------
+     Renderters
+  ------------------------------------------------------------------------- */
+  const renderItem = ({ item }) => (
+    <TouchableOpacity onPress={() => toggleExpand(item.id)} activeOpacity={0.75} style={styles.cardWrap}>
+      <View style={[styles.card, { borderLeftColor: item.color }]}>
+        <LinearGradient colors={[item.lightColor, "#07120f"]} style={styles.cardHeader}>
+          <View style={[styles.iconBox, { backgroundColor: "rgba(0,0,0,0.25)" }]}>
+            <Text style={[styles.iconText, { color: item.color }]}>{item.icon}</Text>
+          </View>
+
+          <View style={styles.headerText}>
+            <Text style={[styles.catTitle, { color: item.color }]}>{item.type}</Text>
+            <Text style={styles.itemCount}>{item.titles.length} tài liệu</Text>
+          </View>
+
+          <View style={[styles.expandBtn, { backgroundColor: "rgba(0,0,0,0.12)" }]}>
+            <Text style={[styles.expandArrow, { color: item.color }]}>{expandedId === item.id ? "▼" : "▶"}</Text>
+          </View>
+        </LinearGradient>
+
+        {expandedId === item.id && (
+          <View style={styles.expanded}>
+            {item.titles.map((title, i) => (
+              <View key={i} style={[styles.challengeRow, { borderLeftColor: item.color }]}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const url = item.urls[i];
+                    if (url && url.startsWith("http")) Linking.openURL(url);
+                  }}
+                  style={[styles.challengeTitleWrap]}
+                >
+                  <Text style={styles.challengeTitle}>{title}</Text>
+                </TouchableOpacity>
+
+                <View style={styles.challengeActions}>
+                  <TouchableOpacity style={[styles.hintBtn, { borderColor: item.color }]} onPress={() => onRequestHint(item.type.toUpperCase(), i)}>
+                    <Text style={[styles.hintBtnText, { color: item.color }]}>Hint</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={[styles.runBtn, { backgroundColor: item.accentColor }]} onPress={() => onRunSandbox(title)}>
+                    <Text style={styles.runBtnText}>Run</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  /* -------------------------------------------------------------------------
+     Main layout
+  ------------------------------------------------------------------------- */
+  return (
+    <View style={styles.container}>
+      <AnimatedBackground />
+
+      {/* Top bar: username + admin button + small leaderboard */}
+      <View style={styles.topBar}>
+        <Text style={styles.username}>⟦ {username || "Khách"} ⟧</Text>
+
+        <View style={{ width: 12 }} />
+
+        {role === "admin" && (
+          <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate("QuanLyTaiLieu", { userData: { username, role } })}>
+            <Text style={styles.adminText}>QUẢN LÝ</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Side scoreboard panel (floating) */}
+      <View style={styles.leaderboardPanel}>
+        <Text style={styles.lbTitle}>Leaderboard (top)</Text>
+        <ScoreboardPanel dbApp={app} />
+      </View>
+
+      {/* Terminal modal */}
+      <TerminalEmbed visible={terminalVisible} onClose={() => setTerminalVisible(false)} command={"sandbox-run"} outputLines={terminalOutput} />
+
+      {/* Hint modal */}
+      <Modal visible={hintVisible} animationType="fade" transparent>
+        <View style={styles.hintOverlay}>
+          <View style={styles.hintBox}>
+            <Text style={styles.hintTitle}>Gợi ý</Text>
+            <ScrollView style={{ maxHeight: height * 0.5 }}>
+              <Text style={styles.hintText}>{currentHint}</Text>
+            </ScrollView>
+            <TouchableOpacity style={styles.hintClose} onPress={() => setHintVisible(false)}>
+              <Text style={styles.hintCloseText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Content */}
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#7fffb2" />
+        </View>
+      ) : (
+        <FlatList
+          data={data}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <Text style={styles.title}>CTF · Training Hub</Text>
+              <Text style={styles.subtitle}>Bài tập · Hint · Sandbox · Leaderboard</Text>
+              <View style={styles.lineWrap}>
+                <View style={styles.line} />
+              </View>
+            </View>
+          }
+        />
+      )}
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+  Styles - Pro hacking green theme, readable and balanced
+--------------------------------------------------------------------------- */
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#04120b" },
+  bgContainer: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  bgGradient: { ...StyleSheet.absoluteFillObject },
+  blobContainer: { position: "absolute", zIndex: 1 },
+  blob: { width: 320, height: 320, borderRadius: 160 },
+  matrix: { position: "absolute", top: 0, left: 0, right: 0, padding: 8 },
+  matrixText: { color: "#003311", fontSize: 12, letterSpacing: 2 },
+
+  topBar: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 46 : 16,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  username: { color: "#aaffc6", fontSize: 14, fontWeight: "700", marginRight: 8 },
+  adminBtn: { backgroundColor: "transparent", borderColor: "#00ff66", borderWidth: 1, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
+  adminText: { color: "#00ff66", fontWeight: "800", fontSize: 12 },
+
+  // Leaderboard floating on left
+  leaderboardPanel: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 120 : 100,
+    left: 12,
+    width: 160,
+    zIndex: 15,
+    backgroundColor: "rgba(0,0,0,0.28)",
+    borderRadius: 10,
+    padding: 8,
+    borderColor: "rgba(0,255,110,0.06)",
+    borderWidth: 1,
+  },
+  lbTitle: { color: "#d9ffeb", fontWeight: "800", marginBottom: 6, textAlign: "center", fontSize: 12 },
+
+  // Scoreboard internal
+  scoreboard: {},
+  scoreboardTitle: { color: "#bfffd4", fontWeight: "800", fontSize: 13, marginBottom: 6, textAlign: "center" },
+  scoreEmpty: { color: "#98f2c6", fontSize: 12, textAlign: "center" },
+  scoreRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  scoreRank: { color: "#8effb9", width: 18, fontWeight: "700" },
+  scoreName: { color: "#eafff0", flex: 1, marginLeft: 6, fontSize: 12 },
+  scoreValue: { color: "#b7ffcf", fontWeight: "700" },
+
+  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
+  list: { paddingHorizontal: 16, paddingTop: Platform.OS === "ios" ? 160 : 120, paddingBottom: 30 },
+
+  header: { alignItems: "center", paddingVertical: 8, marginBottom: 8 },
+  title: { fontSize: 26, color: "#b7ffd9", fontWeight: "900", letterSpacing: 1.8 },
+  subtitle: { fontSize: 12, color: "#9fffcf", marginTop: 6, fontWeight: "600" },
+  lineWrap: { alignItems: "center", marginTop: 8 },
+  line: { width: 80, height: 3, backgroundColor: "#00ff66", borderRadius: 2 },
+
+  cardWrap: { marginBottom: 14 },
+  card: {
+    backgroundColor: "#07110b",
+    borderRadius: 14,
+    borderLeftWidth: 5,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 8,
+    borderColor: "rgba(0,255,110,0.02)",
+  },
+  cardHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 14, gap: 12 },
+
+  iconBox: { width: 52, height: 52, borderRadius: 12, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(0,255,110,0.06)" },
+  iconText: { fontSize: 26 },
+
+  headerText: { flex: 1 },
+  catTitle: { fontSize: 14, fontWeight: "900", marginBottom: 4, textTransform: "uppercase" },
+  itemCount: { fontSize: 12, color: "#80ffb0", fontWeight: "600" },
+
+  expandBtn: { width: 40, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  expandArrow: { fontSize: 13, fontWeight: "900" },
+
+  expanded: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,255,110,0.04)",
+    gap: 10,
+  },
+
+  // Each challenge row inside expanded section
+  challengeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    backgroundColor: "rgba(0,0,0,0.12)",
+  },
+  challengeTitleWrap: { flex: 1 },
+  challengeTitle: { color: "#eafff0", fontSize: 13, fontWeight: "700" },
+
+  challengeActions: { flexDirection: "row", alignItems: "center", marginLeft: 8 },
+  hintBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, marginRight: 8 },
+  hintBtnText: { fontWeight: "800", fontSize: 12 },
+
+  runBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  runBtnText: { color: "#02220f", fontWeight: "900" },
+
+  /* Hint modal */
+  hintOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  hintBox: { width: width * 0.9, maxWidth: 720, backgroundColor: "#041510", padding: 18, borderRadius: 12, borderWidth: 1, borderColor: "rgba(0,255,110,0.06)" },
+  hintTitle: { color: "#bfffd4", fontSize: 16, fontWeight: "900", marginBottom: 8 },
+  hintText: { color: "#eafff0", fontSize: 14, lineHeight: 20 },
+  hintClose: { marginTop: 12, alignSelf: "flex-end", backgroundColor: "transparent", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "#00ff66" },
+  hintCloseText: { color: "#00ff66", fontWeight: "800" },
+
+  /* Terminal modal styles */
+  terminalModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
+  terminalBox: { width: width * 0.92, maxWidth: 900, height: height * 0.6, backgroundColor: "#030b07", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "rgba(0,255,110,0.06)" },
+  terminalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  terminalTitle: { color: "#bfffd4", fontWeight: "900" },
+  terminalClose: { color: "#ff9fa8", fontWeight: "900", fontSize: 16 },
+  terminalContent: { flex: 1, marginTop: 8 },
+  terminalCommand: { color: "#9fffd2", fontWeight: "800" },
+  terminalLine: { color: "#dfffe6", fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", marginBottom: 6 },
+  terminalBtn: { backgroundColor: "rgba(0,255,110,0.06)", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
+  terminalBtnText: { color: "#00ff66", fontWeight: "800" },
+});

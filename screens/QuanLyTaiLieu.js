@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Picker } from "@react-native-picker/picker";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { getDatabase, ref, set, push, onValue, remove } from "firebase/database";
+import { getDatabase, ref, update, push, onValue, remove } from "firebase/database";
 import { useRoute } from "@react-navigation/native";
 import { app } from "../firebaseConfig";
 
@@ -35,15 +35,16 @@ export default function QuanLyTaiLieuScreen() {
   const [tenTaiLieu, setTenTaiLieu] = useState("");
   const [linkTaiLieu, setLinkTaiLieu] = useState("");
   const [loaiTaiLieu, setLoaiTaiLieu] = useState("web");
+  const [goiY, setGoiY] = useState("");
   const [loading, setLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [dangSua, setDangSua] = useState(false);
   const [idDangSua, setIdDangSua] = useState(null);
-  const [tuKhoa, setTuKhoa] = useState(""); // 🔍 Từ khóa tìm kiếm
+  const [tuKhoa, setTuKhoa] = useState("");
 
   const db = getDatabase(app);
 
-  // 🌧 Matrix background
+  // 🌧 Matrix effect
   const rainAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
@@ -53,14 +54,12 @@ export default function QuanLyTaiLieuScreen() {
       ])
     ).start();
   }, []);
-  const translateY = rainAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -height],
-  });
+  const translateY = rainAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -height] });
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*".split("");
   const [matrix, setMatrix] = useState([]);
   useEffect(() => {
-    const cols = 25, rows = 50;
+    const cols = 25,
+      rows = 50;
     const data = Array.from({ length: cols }, (_, i) =>
       Array.from({ length: rows }, (_, j) => ({
         id: `col-${i}-row-${j}`,
@@ -81,13 +80,19 @@ export default function QuanLyTaiLieuScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // 📦 Lấy dữ liệu từ Firebase
+  // 📦 Lấy dữ liệu Firebase (sắp xếp mới nhất trước)
   useEffect(() => {
     const taiLieuRef = ref(db, "tailieu");
     const unsubscribe = onValue(taiLieuRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const arr = Object.keys(data).map((key) => ({ id: key, ...data[key] }));
+        const arr = Object.keys(data)
+          .map((key) => ({ id: key, ...data[key] }))
+          .sort(
+            (a, b) =>
+              new Date(b.ngaytao.split("/").reverse().join("-")) -
+              new Date(a.ngaytao.split("/").reverse().join("-"))
+          );
         cacheTaiLieu.current = arr;
         setTaiLieu(arr);
         setTaiLieuLoc(arr);
@@ -104,7 +109,7 @@ export default function QuanLyTaiLieuScreen() {
   const normalizeLink = (url) =>
     url.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
 
-  // 🔍 Tìm kiếm real-time
+  // 🔍 Tìm kiếm
   const timTaiLieu = (text) => {
     setTuKhoa(text);
     const key = text.trim().toLowerCase();
@@ -120,31 +125,26 @@ export default function QuanLyTaiLieuScreen() {
     setTaiLieuLoc(loc);
   };
 
-  // ➕ Thêm tài liệu (tối ưu tốc độ)
-  const themTaiLieu = async () => {
+  // ⚡ Thêm tài liệu (instant UI + async Firebase)
+  const themTaiLieu = () => {
     if (loading) return;
-    setLoading(true);
-
     if (!tenTaiLieu.trim() || !linkTaiLieu.trim()) {
-      Alert.alert("⚠️ Thiếu thông tin", "Vui lòng nhập đầy đủ tên và link tài liệu!");
-      setLoading(false);
+      Alert.alert("⚠️ Thiếu thông tin", "Vui lòng nhập tên và link tài liệu!");
       return;
     }
 
     const newLink = normalizeLink(linkTaiLieu);
     const ds = cacheTaiLieu.current;
-
     if (ds.some((i) => i.tentailieu.trim().toLowerCase() === tenTaiLieu.trim().toLowerCase())) {
-      Alert.alert("❌ Trùng tên", "Tên tài liệu này đã tồn tại!");
-      setLoading(false);
+      Alert.alert("❌ Trùng tên", "Tên tài liệu đã tồn tại!");
       return;
     }
     if (ds.some((i) => normalizeLink(i.link) === newLink)) {
-      Alert.alert("❌ Trùng link", "Link này đã có trong hệ thống!");
-      setLoading(false);
+      Alert.alert("❌ Trùng link", "Link đã tồn tại!");
       return;
     }
 
+    setLoading(true);
     const newRef = push(ref(db, "tailieu"));
     const id = newRef.key;
     const ngayTao = new Date().toLocaleDateString("vi-VN");
@@ -153,71 +153,72 @@ export default function QuanLyTaiLieuScreen() {
       tentailieu: tenTaiLieu.trim(),
       loai: loaiTaiLieu.toUpperCase(),
       link: linkTaiLieu.trim(),
+      GoiY: goiY.trim() || "",
       ngaytao: ngayTao,
       nguoitao: username,
     };
 
-    cacheTaiLieu.current.unshift({ id, ...duLieuMoi });
-    setTaiLieuLoc([{ id, ...duLieuMoi }, ...taiLieuLoc]);
+    // 🧠 Cập nhật UI trước
+    const updatedList = [{ id, ...duLieuMoi }, ...cacheTaiLieu.current];
+    cacheTaiLieu.current = updatedList;
+    setTaiLieuLoc(updatedList);
     setModalVisible(false);
     setTenTaiLieu("");
     setLinkTaiLieu("");
     setLoaiTaiLieu("web");
-    setLoading(false);
+    setGoiY("");
+    setTimeout(() => setLoading(false), 300);
 
-    set(newRef, duLieuMoi).catch((err) => {
-      Alert.alert("❌ Lỗi ghi Firebase", err.message);
-    });
+    // 🚀 Ghi Firebase nền
+    update(ref(db, "tailieu/" + id), duLieuMoi).catch((err) =>
+      Alert.alert("❌ Lỗi ghi Firebase", err.message)
+    );
   };
 
-  // ✏️ Sửa tài liệu (tối ưu tốc độ)
-  const suaTaiLieu = async () => {
+  // ⚡ Sửa tài liệu (instant UI + async Firebase)
+  const suaTaiLieu = () => {
     if (loading) return;
-    setLoading(true);
-
     if (!tenTaiLieu.trim() || !linkTaiLieu.trim()) {
       Alert.alert("⚠️ Thiếu thông tin", "Vui lòng nhập đầy đủ tên và link!");
-      setLoading(false);
       return;
     }
 
-    const capNhatRef = ref(db, "tailieu/" + idDangSua);
+    setLoading(true);
     const ngaySua = new Date().toLocaleDateString("vi-VN");
     const duLieuSua = {
       tentailieu: tenTaiLieu.trim(),
       loai: loaiTaiLieu.toUpperCase(),
       link: linkTaiLieu.trim(),
+      GoiY: goiY.trim() || "",
       ngaytao: ngaySua,
       nguoitao: username,
     };
 
-    const danhSachMoi = cacheTaiLieu.current.map((tl) =>
+    // Cập nhật UI trước
+    const updatedList = cacheTaiLieu.current.map((tl) =>
       tl.id === idDangSua ? { ...tl, ...duLieuSua } : tl
     );
-    cacheTaiLieu.current = danhSachMoi;
-    setTaiLieuLoc(danhSachMoi);
-
+    cacheTaiLieu.current = updatedList;
+    setTaiLieuLoc(updatedList);
     setModalVisible(false);
     setDangSua(false);
     setIdDangSua(null);
-    setTenTaiLieu("");
-    setLinkTaiLieu("");
-    setLoaiTaiLieu("web");
-    setLoading(false);
+    setTimeout(() => setLoading(false), 300);
 
-    set(capNhatRef, duLieuSua).catch((err) => {
-      Alert.alert("❌ Lỗi cập nhật", err.message);
-    });
+    // Ghi Firebase nền
+    update(ref(db, "tailieu/" + idDangSua), duLieuSua).catch((err) =>
+      Alert.alert("❌ Lỗi cập nhật", err.message)
+    );
   };
 
   // 🗑 Xóa
-  const xoaTaiLieu = async (id) => {
+  const xoaTaiLieu = (id) => {
     Alert.alert("Xác nhận", "Bạn có chắc muốn xóa tài liệu này?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa",
         style: "destructive",
-        onPress: async () => await remove(ref(db, "tailieu/" + id)),
+        onPress: () => remove(ref(db, "tailieu/" + id)),
       },
     ]);
   };
@@ -252,6 +253,7 @@ export default function QuanLyTaiLieuScreen() {
         >
           <Text style={styles.cardLink}>{item.link}</Text>
         </TouchableOpacity>
+        {item.GoiY ? <Text style={styles.cardHint}>💡 {item.GoiY}</Text> : null}
         <Text style={styles.metaText}>
           🧑‍💻 {item.nguoitao} | 📅 {item.ngaytao}
         </Text>
@@ -264,6 +266,7 @@ export default function QuanLyTaiLieuScreen() {
             setTenTaiLieu(item.tentailieu);
             setLinkTaiLieu(item.link);
             setLoaiTaiLieu(item.loai);
+            setGoiY(item.GoiY || "");
             setModalVisible(true);
           }}
         >
@@ -311,7 +314,7 @@ export default function QuanLyTaiLieuScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 🔍 Thanh tìm kiếm */}
+      {/* 🔍 Tìm kiếm */}
       <View style={styles.searchContainer}>
         <Icon name="magnify" size={22} color="#00FFAA" style={{ marginRight: 8 }} />
         <TextInput
@@ -346,7 +349,7 @@ export default function QuanLyTaiLieuScreen() {
         <FlatList data={taiLieuLoc} renderItem={renderItem} keyExtractor={(item) => item.id} />
       )}
 
-      {/* Modal thêm / sửa */}
+      {/* Modal */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
@@ -366,6 +369,13 @@ export default function QuanLyTaiLieuScreen() {
               style={styles.input}
               value={linkTaiLieu}
               onChangeText={setLinkTaiLieu}
+            />
+            <TextInput
+              placeholder="Gợi ý (không bắt buộc)"
+              placeholderTextColor="#888"
+              style={styles.input}
+              value={goiY}
+              onChangeText={setGoiY}
             />
             <Picker selectedValue={loaiTaiLieu} onValueChange={setLoaiTaiLieu} style={styles.picker}>
               <Picker.Item label="Web" value="Web" />
@@ -420,24 +430,14 @@ const styles = StyleSheet.create({
     borderColor: "#00FFAA55",
     paddingHorizontal: 10,
   },
-  searchInput: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 14,
-    paddingVertical: 8,
-  },
+  searchInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 8 },
   filterMenu: {
     backgroundColor: "rgba(0,50,30,0.9)",
     borderBottomWidth: 1,
     borderBottomColor: "#00FFAA55",
     paddingVertical: 8,
   },
-  filterOption: {
-    color: "#00FFAA",
-    fontSize: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 20,
-  },
+  filterOption: { color: "#00FFAA", fontSize: 16, paddingVertical: 6, paddingHorizontal: 20 },
   card: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -455,6 +455,13 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 12,
     textDecorationLine: "underline",
+  },
+  cardHint: {
+    color: "#66FFCC",
+    marginLeft: 32,
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: "italic",
   },
   cardType: { color: "#00FFAA", marginRight: 10 },
   metaText: { color: "#aaa", fontSize: 11, marginLeft: 32, marginTop: 3 },
