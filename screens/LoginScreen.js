@@ -448,19 +448,23 @@ export default function LoginScreen({ navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Digital readout */}
-        <View  style={styles.readoutText}> 
-         <View style={{ height: 1, backgroundColor: "#555", width: "100%", marginVertical: 10 }} />
+        <View style={styles.readout}>
+          <View style={{ height: 1, backgroundColor: "#555", width: "100%", marginVertical: 10 }} />
 
-          <View   style={styles.readoutText}>
-          <Text style={styles.readoutText}>Bạn chưa có tài khoản?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate("SignupScreen")}>
-            <Text style={[styles.readoutText, { textDecorationLine: "underline", color: "#00F0FF" }]}>
-              Đăng ký
+          <View style={styles.readoutContainer}>
+            <Text style={styles.readoutText}>Bạn chưa có tài khoản?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("SignupScreen")}>
+              <Text style={[styles.readoutText, { textDecorationLine: "underline", color: "#00F0FF" }]}>Đăng ký</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#555", width: "100%", marginVertical: 10 }} />
+
+          <TouchableOpacity onPress={() => navigation.navigate("QuenMatKhauScreen")}>
+            <Text style={[styles.readoutText, { color: "#FF00FF", fontWeight: "700", letterSpacing: 1.5 }]}>
+              ? Quên mật khẩu ?
             </Text>
           </TouchableOpacity>
-        </View>
-
         </View>
       </Animated.View>
     </LinearGradient>
@@ -658,8 +662,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     marginBottom: 20,
     letterSpacing: 1,
-    fontWeight: "600",
-     fontWeight: "bold",
+    fontWeight: "bold",
   },
 
   // Input rows
@@ -722,20 +725,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(0,240,255,0.15)",
   },
+  readoutContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    alignItems: "center",
+  },
   readoutText: {
     color: "#4A9FB5",
     fontSize: 15,
     letterSpacing: 1,
     marginVertical: 2,
     fontWeight: "600",
-    alignItems: "center"
-  },
-  readoutText1: {
-    color: "#4A9FB5",
-    fontSize: 16,
-    letterSpacing: 1,
-    marginVertical: 2,
-    fontWeight: "600",
-
   },
 })
