@@ -36,6 +36,13 @@ import ChiTiet_Email from './Code/email/chitiet_email';
 import CheckEmails from './Code/email/check-emails';
 import ThongKeVaCanhBao from './Code/email/thongkevacanhbao_email';
 import Themnhieu_email from './Code/email/Themnhieu_email';
+import AD_trungtamhotro from './Code/email/AD_trungtamhotro';
+import AD_LoaiCauhoihotro from './Code/PhanhoiHotro/AD_LoaiCauhoihotro';
+import AD_QuanlyLoaiCauhoi from './Code/PhanhoiHotro/AD_QuanlyLoaiCauhoi';
+import ThemMailMau from './Code/email/themmailmau';
+import HienthiEmail from './Code/email/hienthi_email';
+import QuanLyHienthiEmail from './Code/email/quan_ly_hienthi_email';
+import { RichTextDisplay } from './Code/email/rich-text-display';
 
 const Stack = createStackNavigator();
 
@@ -75,7 +82,14 @@ export default function App() {
         <Stack.Screen name="CheckEmails" component={CheckEmails} options={{ title: 'Kiểm tra Email' }} />
         <Stack.Screen name="ThongKeVaCanhBao" component={ThongKeVaCanhBao} options={{ title: 'Thống kê và cảnh báo' }} />
         <Stack.Screen name="Themnhieu_email" component={Themnhieu_email} options={{ title: 'Thêm nhiều email' }} />
-
+        <Stack.Screen name="AD_trungtamhotro" component={AD_trungtamhotro} options={{ title: 'Quản lý trung tâm hỗ trợ' }} />
+        <Stack.Screen name="AD_LoaiCauhoihotro" component={AD_LoaiCauhoihotro} options={{ title: 'Quản lý loại câu hỏi hỗ trợ' }} />
+        <Stack.Screen name="AD_QuanlyLoaiCauhoi" component={AD_QuanlyLoaiCauhoi} options={{ title: 'Quản lý loại câu hỏi hỗ trợ' }} />
+        <Stack.Screen name="ThemMailMau" component={ThemMailMau} options={{ title: 'Thêm email mẫu' }} />
+        <Stack.Screen name="HienthiEmail" component={HienthiEmail} options={{ title: 'Hiển thị email' }} />
+        <Stack.Screen name="QuanLyHienthiEmail" component={QuanLyHienthiEmail} options={{ title: 'Quản lý hiển thị email' }} />
+        <Stack.Screen name="RichTextDisplay" component={RichTextDisplay} options={{ title: 'Rich Text Display' }} />
+        
 
       </Stack.Navigator>
       <Toast />

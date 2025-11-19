@@ -8,11 +8,8 @@ import * as FileSystem from "expo-file-system"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 import { database } from "../../firebaseConfig"
 import { ref, push, set, get, remove } from "firebase/database"
-import React from "react"
-import { useNavigation } from "@react-navigation/native"
 
 export default function Themnhieu_email() {
-  const navigation = useNavigation()
   const [tableData, setTableData] = useState([])
   const [headers, setHeaders] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState("vi")
@@ -77,130 +74,56 @@ export default function Themnhieu_email() {
 
     const sheetName = workbook.SheetNames[0]
     const sheet = workbook.Sheets[sheetName]
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
-    const range = XLSX.utils.decode_range(sheet["!ref"])
-    
-    // Parse header và tìm các columns hợp lệ (không rỗng)
-    const validColumns = []
-    const headerRow = []
-    
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
-      const cell = sheet[cellRef]
-      const headerValue = cell ? String(cell.v).trim() : ""
-      
-      // Chỉ lấy cột có header không rỗng
-      if (headerValue) {
-        validColumns.push(col)
-        headerRow.push(headerValue)
-      }
-    }
+    if (jsonData.length === 0) return
 
-    // Parse data rows - CHỈ lấy data từ các cột hợp lệ
-    const tableData = []
-    for (let row = 1; row <= range.e.r; row++) {
-      const dataRow = []
-      for (let col of validColumns) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: col })
-        const cell = sheet[cellRef]
-        // Giữ nguyên 100% content
-        dataRow.push(cell ? cell.v : "")
-      }
-      // Chỉ thêm row nếu không phải row rỗng hoàn toàn
-      if (dataRow.some(val => val !== "")) {
-        tableData.push(dataRow)
-      }
-    }
+    setHeaders(jsonData[0])
+    setTableData(jsonData.slice(1))
 
-    if (headerRow.length === 0) {
-      alert("Không tìm thấy header hợp lệ trong file!")
-      return
-    }
-
-    setHeaders(headerRow)
-    setTableData(tableData)
-
-    const flat = [...headerRow, ...tableData.flat()]
+    const flat = jsonData.flat()
     const isEmail = flat.some((val) => typeof val === "string" && val.includes("@"))
     setFileType(isEmail ? "email" : "message")
   }
 
-  const sanitizeKey = (key) => {
-    if (!key || typeof key !== 'string') return 'unnamed_column'
-    
-    // Loại bỏ các ký tự không được phép trong Firebase keys
-    return key
-      .replace(/[.#$\/\[\]]/g, '_') // Thay thế ký tự đặc biệt bằng underscore
-      .replace(/\s+/g, '_')          // Thay khoảng trắng bằng underscore
-      .trim()
-      .substring(0, 100) || 'unnamed_column' // Giới hạn độ dài và fallback
-  }
-
   const handleSaveToFirebase = async () => {
     if (tableData.length === 0) return alert("Không có dữ liệu để lưu")
-    
-    const sanitizedHeaders = headers.map(h => sanitizeKey(h))
-    
     setIsSaving(true)
     setLoading(true)
     stopRequested.current = false
 
     try {
       const taskRef = ref(database, `task1_email/${selectedLanguage}`)
-      
       const snapshot = await get(taskRef)
-      let existing = snapshot.exists() ? snapshot.val() : {}
-
-      const columnOrderRef = ref(database, `task1_email/${selectedLanguage}_columnOrder`)
-      await set(columnOrderRef, headers) // Lưu headers gốc
-
-      const columnMappingRef = ref(database, `task1_email/${selectedLanguage}_columnMapping`)
-      const mapping = {}
-      headers.forEach((originalName, idx) => {
-        mapping[originalName] = sanitizedHeaders[idx]
-      })
-      await set(columnMappingRef, mapping)
-
-      let savedCount = 0
-      let skippedCount = 0
+      const existing = snapshot.exists() ? snapshot.val() : {}
 
       for (let i = currentIndex; i < tableData.length; i++) {
-        if (stopRequested.current) {
-          break
-        }
+        if (stopRequested.current) break
 
         const row = tableData[i]
-        
         const dataObj = {}
-        sanitizedHeaders.forEach((sanitizedHeader, idx) => {
-          const cellValue = row[idx] ?? ""
-          dataObj[sanitizedHeader] = String(cellValue)
-        })
+        headers.forEach((h, idx) => (dataObj[h] = row[idx] ?? ""))
 
-        if (isDuplicateRow(dataObj, existing)) {
-          skippedCount++
-          continue
-        }
+        const isDuplicate = Object.values(existing).some(
+          (r) => JSON.stringify(r).toLowerCase() === JSON.stringify(dataObj).toLowerCase(),
+        )
+        if (isDuplicate) continue
 
         const newRecordRef = push(taskRef)
         await set(newRecordRef, dataObj)
-        
-        existing[newRecordRef.key] = dataObj
-
         setSavedRecordIds((prev) => [...prev, newRecordRef.key])
         setSavedDataPreview((prev) => [...prev, dataObj])
 
         setCurrentIndex(i + 1)
-        savedCount++
       }
 
       if (!stopRequested.current) {
-        alert(`✅ Đã lưu xong! ${savedCount} bản ghi mới, ${skippedCount} bản ghi trùng`)
+        alert("✅ Đã lưu xong toàn bộ dữ liệu!")
         setCurrentIndex(0)
       }
     } catch (e) {
-      console.error("[v0] LỖI:", e)
-      alert(`❌ Lỗi khi lưu Firebase: ${e.message}`)
+      console.error(e)
+      alert("❌ Lỗi khi lưu Firebase!")
     } finally {
       setIsSaving(false)
       setLoading(false)
@@ -252,39 +175,6 @@ export default function Themnhieu_email() {
     setShowDeleteConfirm(true)
   }
 
-  const isRowIdentical = (existingRow, newRow) => {
-    const keys = Object.keys(newRow)
-    for (let key of keys) {
-      const existingVal = String(existingRow[key] ?? "")
-      const newVal = String(newRow[key] ?? "")
-      if (existingVal !== newVal) {
-        return false
-      }
-    }
-    return true
-  }
-
-  const isDuplicateRow = (newRow, existingRecords) => {
-    return Object.values(existingRecords).some((existingRow) => {
-      const keys = Object.keys(newRow).filter(k => !k.startsWith('_') && !k.endsWith('_formatting'))
-      
-      for (let key of keys) {
-        const existingVal = String(existingRow[key] ?? "")
-        const newVal = String(newRow[key] ?? "")
-        if (existingVal !== newVal) {
-          return false
-        }
-      }
-      return true
-    })
-  }
-
-  const parseFormattedText = (text) => {
-    if (!text) return text
-    // Hỗ trợ: **text** = in đậm, *text* = in nghiêng, \n = xuống dòng
-    return text
-  }
-
   const languageOptions = {
     vi: {
       title: "Tải lên Hàng loạt",
@@ -334,65 +224,55 @@ export default function Themnhieu_email() {
 
   const lang = languageOptions[selectedLanguage] || languageOptions.vi
 
+  const scrollViewStyle =
+    Platform.OS === "web"
+      ? { ...styles.scrollContent, maxHeight: "calc(100vh - 200px)", overflowY: "auto" }
+      : styles.scrollContent
+
   return (
     <View style={styles.container}>
-      <View style={styles.topNavigation}>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate("HienthiEmail")} 
-          style={styles.navButton}
-        >
-          <Icon name="eye" size={20} color="#00D9FF" />
-          <Text style={styles.navButtonText}>Xem</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => {}} style={styles.backButton}>
+          <Icon name="chevron-left" size={24} color="#00D9FF" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate("QuanLyHienthiEmail")} 
-          style={styles.navButton}
-        >
-          <Icon name="cog" size={20} color="#00D9FF" />
-          <Text style={styles.navButtonText}>Quản lý</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{lang.title}</Text>
+
+        <View style={styles.languageSwitcher}>
+          <TouchableOpacity
+            onPress={() => setSelectedLanguage("vi")}
+            style={[styles.langButton, selectedLanguage === "vi" && styles.langButtonActive]}
+          >
+            <Text style={[styles.langButtonText, selectedLanguage === "vi" && styles.langButtonTextActive]}>VN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSelectedLanguage("en")}
+            style={[styles.langButton, selectedLanguage === "en" && styles.langButtonActive]}
+          >
+            <Text style={[styles.langButtonText, selectedLanguage === "en" && styles.langButtonTextActive]}>EN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSelectedLanguage("zh")}
+            style={[styles.langButton, selectedLanguage === "zh" && styles.langButtonActive]}
+          >
+            <Text style={[styles.langButtonText, selectedLanguage === "zh" && styles.langButtonTextActive]}>中文</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSelectedLanguage("ko")}
+            style={[styles.langButton, selectedLanguage === "ko" && styles.langButtonActive]}
+          >
+            <Text style={[styles.langButtonText, selectedLanguage === "ko" && styles.langButtonTextActive]}>한국</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={scrollViewStyle}
         showsVerticalScrollIndicator={true}
-        nestedScrollEnabled={true}
+        {...(Platform.OS === "web" && {
+          contentContainerStyle: { flexGrow: 1 },
+          nestedScrollEnabled: true,
+        })}
       >
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{lang.title}</Text>
-        </View>
-
-        <View style={styles.languageRow}>
-          <Text style={styles.languageLabel}>Ngôn ngữ dữ liệu:</Text>
-          <View style={styles.languageSwitcher}>
-            <TouchableOpacity
-              onPress={() => setSelectedLanguage("vi")}
-              style={[styles.langButton, selectedLanguage === "vi" && styles.langButtonActive]}
-            >
-              <Text style={[styles.langButtonText, selectedLanguage === "vi" && styles.langButtonTextActive]}>VN</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setSelectedLanguage("en")}
-              style={[styles.langButton, selectedLanguage === "en" && styles.langButtonActive]}
-            >
-              <Text style={[styles.langButtonText, selectedLanguage === "en" && styles.langButtonTextActive]}>EN</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setSelectedLanguage("zh")}
-              style={[styles.langButton, selectedLanguage === "zh" && styles.langButtonActive]}
-            >
-              <Text style={[styles.langButtonText, selectedLanguage === "zh" && styles.langButtonTextActive]}>中文</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setSelectedLanguage("ko")}
-              style={[styles.langButton, selectedLanguage === "ko" && styles.langButtonActive]}
-            >
-              <Text style={[styles.langButtonText, selectedLanguage === "ko" && styles.langButtonTextActive]}>한국</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         <View style={styles.uploadSection}>
           <View style={styles.dragDropZone}>
             <Icon name="upload" size={48} color="#00D9FF" />
@@ -437,31 +317,32 @@ export default function Themnhieu_email() {
                 </ScrollView>
               </View>
             </ScrollView>
-            
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={isSaving ? handleStopSaving : handleCancelSave} style={styles.cancelSaveButton}>
-                <Icon name="trash-can-outline" size={20} color="#fff" style={{ marginRight: 6 }} />
-                <Text style={styles.cancelSaveButtonText}>{isSaving ? "Dừng thêm" : "Hủy"}</Text>
-              </TouchableOpacity>
-
-              {!isSaving && (
-                <TouchableOpacity onPress={handleSaveToFirebase} style={styles.saveButton}>
-                  <Icon name="database-plus" size={20} color="#000" style={{ marginRight: 6 }} />
-                  <Text style={styles.saveButtonText}>Lưu Firebase</Text>
-                </TouchableOpacity>
-              )}
-
-              {isSaving && (
-                <TouchableOpacity style={[styles.saveButton, styles.disabledButton]} disabled>
-                  <Icon name="database-plus" size={20} color="#000" style={{ marginRight: 6 }} />
-                  <Text style={styles.saveButtonText}>Lưu Firebase</Text>
-                </TouchableOpacity>
-              )}
-            </View>
           </View>
         )}
 
         {tableData.length === 0 && <Text style={styles.emptyText}>Chưa có dữ liệu để hiển thị</Text>}
+
+        <View style={{ height: 80 }} />
+        <View style={styles.buttonContainerFixed}>
+        <TouchableOpacity onPress={isSaving ? handleStopSaving : handleCancelSave} style={styles.cancelSaveButton}>
+          <Icon name="trash-can-outline" size={20} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.cancelSaveButtonText}>{isSaving ? "Dừng thêm" : "Hủy"}</Text>
+        </TouchableOpacity>
+
+        {!isSaving && (
+          <TouchableOpacity onPress={handleSaveToFirebase} style={styles.saveButton}>
+            <Icon name="database-plus" size={20} color="#000" style={{ marginRight: 6 }} />
+            <Text style={styles.saveButtonText}>Lưu Firebase</Text>
+          </TouchableOpacity>
+        )}
+
+        {isSaving && (
+          <TouchableOpacity style={[styles.saveButton, styles.disabledButton]} disabled>
+            <Icon name="database-plus" size={20} color="#000" style={{ marginRight: 6 }} />
+            <Text style={styles.saveButtonText}>Lưu Firebase</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       </ScrollView>
 
       <Modal visible={showDeleteConfirm} transparent animationType="slide">
@@ -501,11 +382,9 @@ export default function Themnhieu_email() {
       </Modal>
 
       {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00D9FF" />
-            <Text style={styles.loadingText}>Đang lưu dữ liệu...</Text>
-          </View>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#00D9FF" />
+          <Text style={{ color: "#00D9FF", marginTop: 10 }}>Đang xử lý dữ liệu...</Text>
         </View>
       )}
     </View>
@@ -517,48 +396,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0a0e27",
   },
-  topNavigation: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 12,
-    backgroundColor: "#0a0e27",
-    borderBottomWidth: 1,
-    borderBottomColor: "#252d47",
-  },
-  scrollView: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflowY: 'auto',
-      WebkitScrollbar: {
-        width: '12px',
-      },
-      WebkitScrollbarTrack: {
-        background: '#1a1f3a',
-      },
-      WebkitScrollbarThumb: {
-        background: '#00D9FF',
-        borderRadius: '6px',
-      },
-      WebkitScrollbarThumbHover: {
-        background: '#00B8D4',
-      },
-      maxHeight: 'calc(89vh - 40px)', // Trừ đi chiều cao topNavigation
-    }),
-  },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 30,
+    flex: 1,
+    padding: 25,
   },
-  headerTitleContainer: {
+  header: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 25,
     backgroundColor: "#1a1f3a",
-    padding: 18,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#00D9FF",
@@ -567,6 +414,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    marginTop: 25,
+    marginHorizontal: 25,
+    justifyContent: "space-between",
   },
   headerTitle: {
     fontSize: 26,
@@ -574,22 +424,36 @@ const styles = StyleSheet.create({
     color: "#00D9FF",
     letterSpacing: 1,
     textTransform: "uppercase",
+    flex: 1,
   },
-  languageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  languageLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#e0f2fe",
+  backButton: {
+    marginRight: 12,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#252d47",
   },
   languageSwitcher: {
     flexDirection: "row",
     gap: 8,
+  },
+  langButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: "#252d47",
+    borderWidth: 1,
+    borderColor: "#00D9FF",
+  },
+  langButtonActive: {
+    backgroundColor: "#00D9FF",
+  },
+  langButtonText: {
+    color: "#00D9FF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  langButtonTextActive: {
+    color: "#0a0e27",
   },
   uploadSection: {
     alignItems: "center",
@@ -599,7 +463,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#00D9FF",
     borderStyle: "dashed",
-    marginBottom: 20,
+    marginBottom: 25,
     shadowColor: "#00D9FF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
@@ -657,7 +521,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#00FF88",
-    marginBottom: 15,
+    marginBottom: 20,
   },
   fileNameText: {
     color: "#00FF88",
@@ -668,15 +532,16 @@ const styles = StyleSheet.create({
   tableSection: {
     backgroundColor: "#1a1f3a",
     borderRadius: 12,
-    borderWidth: 3,
-    borderColor: "#00FF88",
+    borderWidth: 1,
+    borderColor: "#00D9FF",
     overflow: "hidden",
     shadowColor: "#00D9FF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
-    marginBottom: 20,
+    paddingBottom: 20,
+    marginBottom: 15,
   },
   tableWrapper: {
     flexGrow: 1,
@@ -685,9 +550,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     backgroundColor: "#1a1f3a",
-    borderWidth: 2,
-    borderColor: "#00D9FF",
-    borderRadius: 8,
   },
   tableHeader: {
     flexDirection: "row",
@@ -702,18 +564,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderColor: "#252d47", // Màu viền giữa các hàng
+    borderColor: "#252d47",
   },
   tableRowAlternate: {
     backgroundColor: "#151a2f",
   },
-  headerCell: { // Style cho header cột
+  headerCell: {
     width: 150,
     fontWeight: "700",
     paddingVertical: 14,
     paddingHorizontal: 10,
     borderRightWidth: 1,
-    borderColor: "#fff", // Màu viền giữa các tiêu đề cột
+    borderColor: "#252d47",
     color: "#00D9FF",
     fontSize: 15,
     textAlign: "left",
@@ -723,25 +585,25 @@ const styles = StyleSheet.create({
     width: 150,
     paddingVertical: 12,
     paddingHorizontal: 10,
-    color: "#e0f2fe", 
+    color: "#e0f2fe",
     fontSize: 14,
     textAlign: "left",
     borderRightWidth: 1,
-    borderColor: "#3b3d44ff", // Màu viền giữa các cột dữ liệu
+    borderColor: "#252d47",
   },
-  buttonContainer: {
+  buttonContainerFixed: {
     flexDirection: "row",
     gap: 8,
     justifyContent: "flex-end",
-    paddingHorizontal: 15,
-    paddingTop: 40,
-    paddingBottom: 45,
-    backgroundColor: "#1a1f3a",
+    padding: 12,
+    backgroundColor: "#0a0e27",
+    borderTopWidth: 1,
+    borderTopColor: "#252d47",
   },
   cancelSaveButton: {
     backgroundColor: "#FF3333",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
@@ -755,8 +617,8 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: "#00FF88",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
@@ -781,41 +643,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   disabledButton: { opacity: 0.5 },
+  loading: { alignItems: "center", marginVertical: 20 },
   emptyText: {
-    color: "#7dd3fc",
-    fontSize: 14,
+    marginTop: 30,
+    color: "#64748b",
     textAlign: "center",
-    marginTop: 20,
-  },
-  loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(10, 14, 39, 0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-  },
-  loadingContainer: {
-    backgroundColor: "#1a1f3a",
-    padding: 30,
-    borderRadius: 12,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#00D9FF",
-    shadowColor: "#00D9FF",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  loadingText: {
-    color: "#00D9FF",
-    marginTop: 15,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontStyle: "italic",
   },
   modalOverlay: {
     flex: 1,
@@ -901,39 +735,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
-  },
-  navButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: "#252d47",
-    borderWidth: 1,
-    borderColor: "#00D9FF",
-    gap: 4,
-  },
-  navButtonText: {
-    color: "#00D9FF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  langButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#00D9FF",
-    backgroundColor: "#252d47",
-  },
-  langButtonActive: {
-    backgroundColor: "#00D9FF",
-  },
-  langButtonText: {
-    color: "#00D9FF",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  langButtonTextActive: {
-    color: "#0a0e27",
   },
 })
